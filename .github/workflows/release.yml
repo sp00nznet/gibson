@@ -59,7 +59,7 @@ jobs:
       - name: Notes from CHANGELOG.md
         run: |
           V="${GITHUB_REF_NAME#v}"
-          awk -v v="$V" '$0 ~ "^## \[" v "\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md > notes.md
+          awk -v h="## [$V]" 'index($0, h) == 1 {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
           test -s notes.md || { echo "CHANGELOG.md has no section for $V"; exit 1; }
       - run: gh release create "$GITHUB_REF_NAME" out/* --title "GIBSON $GITHUB_REF_NAME" --notes-file notes.md
         env:
