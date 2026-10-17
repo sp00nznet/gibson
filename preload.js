@@ -17,10 +17,13 @@ contextBridge.exposeInMainWorld('gibson', {
   onHotkey: (fn) => ipcRenderer.on('hotkey', (_e, a) => fn(a)),
   menu: (state) => ipcRenderer.send('menu', state),
   shellMenu: () => ipcRenderer.send('menu:shells'),
+  linkCheck: (id, files) => ipcRenderer.invoke('link:check', id, files),
+  linkOpen: (id, file, line, col) => ipcRenderer.send('link:open', id, file, line, col),
   saveTabs: (list) => ipcRenderer.send('tabs:save', list),
   musicList: () => ipcRenderer.invoke('music:list'),
   musicPick: () => ipcRenderer.invoke('music:pick'),
   save: (key, v) => ipcRenderer.send('cfg:save', key, v),
   llm: (ev) => ipcRenderer.invoke('nyx:llm', ev),
   fullscreen: () => ipcRenderer.send('win:fullscreen'),
+  focusWindow: () => ipcRenderer.send('win:focus'),
 });

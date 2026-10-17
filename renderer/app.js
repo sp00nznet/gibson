@@ -24,27 +24,63 @@
     },
   };
   // Tabs each hold 1 to 4 panes. Pane ids are global: main.js keys its shells by them.
-  const tabs = []; let tab = null, focused = null, nextId = 1, nextTab = 1;
+  const tabs = []; let tab = null, focused = null, nextId = 1, dragged = null;
   const allPanes = () => tabs.flatMap((t) => t.panes);
 
   // opts: { profile, cwd } for the tab's shells; blank means the default shell in the home folder.
   function makeTab(opts) {
-    const t = { n: nextTab++, panes: [], focused: null, cwdName: '', opts: opts || {}, el: document.createElement('div'), btn: document.createElement('button') };
+    const t = { panes: [], focused: null, cwdName: '', opts: opts || {}, c: 0.5, r: 0.5, el: document.createElement('div'), btn: document.createElement('button') };
     t.el.className = 'tab n1'; $('termwrap').appendChild(t.el);
-    t.btn.className = 'tabbtn'; t.btn.title = 'middle-click closes';
+    splitters(t);
+    t.btn.className = 'tabbtn'; t.btn.title = 'double-click renames, drag to reorder, middle-click closes';
+    t.btn.draggable = true; // drag a tab onto another to move it there
+    t.btn.ondragstart = (e) => { dragged = t; e.dataTransfer.effectAllowed = 'move'; };
+    t.btn.ondragover = (e) => { if (dragged && dragged !== t) e.preventDefault(); };
+    t.btn.ondrop = (e) => {
+      e.preventDefault(); if (!dragged || dragged === t) return;
+      const to = tabs.indexOf(t); tabs.splice(tabs.indexOf(dragged), 1); tabs.splice(to, 0, dragged);
+      for (const x of tabs) $('tabs').insertBefore(x.btn, $('newtab'));
+      dragged = null; tabs.forEach(label);
+    };
     t.btn.innerHTML = '<span class="lbl"></span><span class="x" title="close tab">×</span>';
     t.btn.onclick = (e) => { if (e.target.classList.contains('x')) closeTab(t); else switchTab(t); };
     t.btn.onauxclick = (e) => { if (e.button === 1) closeTab(t); };
     t.btn.ondblclick = (e) => { if (!e.target.classList.contains('x')) renameTab(t); };
     $('tabs').insertBefore(t.btn, $('newtab'));
-    tabs.push(t); makePane(t); label(t);
+    tabs.push(t); makePane(t, t.opts.from); label(t);
     window.gibson.listDir(t.panes[0].id).then((fs) => { t.cwdName = baseName(fs.cwd); label(t); });
     return t;
   }
   function label(t) {
     const shell = t.opts.profile && t.opts.profile !== B.defaultShell ? ` (${t.opts.profile})` : '';
     const name = t.opts.name || `${t.cwdName || 'shell'}${shell}`; // a name you gave it wins over the folder
-    t.btn.firstChild.textContent = `${t.n}:${name}${t.panes.length > 1 ? ' [' + t.panes.length + ']' : ''}`;
+    const badge = (t.broadcast ? '\u21f6 ' : '') + (t.done ? '\u25cf ' : ''); // typing into all panes; a command finished in the background
+    t.btn.firstChild.textContent = `${badge}${tabs.indexOf(t) + 1}:${name}${t.panes.length > 1 ? ' [' + t.panes.length + ']' : ''}`;
+    t.btn.style.setProperty('--tabc', t.opts.color || '');
+    t.btn.classList.toggle('coloured', !!t.opts.color);
+  }
+  // Pane sizes: the column and row split as fractions, dragged by two handles.
+  function splitters(t) {
+    for (const [cls, key] of [['vsplit', 'c'], ['hsplit', 'r']]) {
+      const h = document.createElement('div'); h.className = 'splitter ' + cls; t.el.appendChild(h);
+      h.onpointerdown = (e) => {
+        e.preventDefault(); h.setPointerCapture(e.pointerId);
+        h.onpointermove = (m) => {
+          const r = t.el.getBoundingClientRect();
+          t[key] = Math.max(0.15, Math.min(0.85, key === 'c' ? (m.clientX - r.left) / r.width : (m.clientY - r.top) / r.height));
+          layout(t);
+        };
+        h.onpointerup = () => { h.onpointermove = null; };
+      };
+    }
+    layout(t);
+  }
+  function layout(t) {
+    const n = t.panes.length, cols = n > 1 && !t.zoom, rows = n > 2 && !t.zoom;
+    t.el.style.gridTemplateColumns = cols ? `${t.c}fr ${1 - t.c}fr` : '';
+    t.el.style.gridTemplateRows = rows ? `${t.r}fr ${1 - t.r}fr` : '';
+    t.el.style.setProperty('--c', t.c); t.el.style.setProperty('--r', t.r);
+    t.el.classList.toggle('zoomed', !!t.zoom);
   }
   // Rename in place: Enter keeps it, Escape backs out, an empty name goes back to the folder.
   function renameTab(t) {
@@ -64,6 +100,7 @@
   function switchTab(t) {
     tab = t;
     for (const x of tabs) { x.el.classList.toggle('hidden', x !== t); x.btn.classList.toggle('on', x === t); }
+    if (t.done) { t.done = false; label(t); }
     $('tabs').classList.toggle('solo', tabs.length < 2);
     focused = null; setFocus(t.focused || t.panes[0]); focused.term.focus();
   }
@@ -72,25 +109,30 @@
     for (const p of t.panes.slice()) closePane(p);
     t.el.remove(); t.btn.remove(); tabs.splice(i, 1);
     if (!tabs.length) makeTab();
+    tabs.forEach(label);
     switchTab(tab === t || !tabs.includes(tab) ? tabs[Math.min(i, tabs.length - 1)] : tab);
   }
   const stepTab = (d) => switchTab(tabs[(tabs.indexOf(tab) + d + tabs.length) % tabs.length]);
   const baseName = (dir) => dir.split(/[\\/]/).filter(Boolean).pop() || dir;
 
-  function makePane(t) {
+  // from: the pane whose folder the new shell starts in (split from here)
+  function makePane(t, from) {
     const id = nextId++, el = document.createElement('div');
     el.className = 'pane'; t.el.appendChild(el);
-    const term = new Terminal(TERM_OPTS), fit = new FitAddon.FitAddon();
-    term.loadAddon(fit);
+    const term = new Terminal(TERM_OPTS), fit = new FitAddon.FitAddon(), search = new SearchAddon.SearchAddon();
+    term.loadAddon(fit); term.loadAddon(search);
+    fileLinks(term, id);
     term.loadAddon(new WebLinksAddon.WebLinksAddon((_e, uri) => window.open(uri)));
     term.loadAddon(new Unicode11Addon.Unicode11Addon()); term.unicode.activeVersion = '11';
     term.open(el);
     try { const gl = new WebglAddon.WebglAddon(); gl.onContextLoss(() => gl.dispose()); term.loadAddon(gl); } catch { /* DOM renderer is fine */ }
     const chat = document.createElement('div'); chat.className = 'nyxchat'; el.appendChild(chat);
-    const p = { id, el, term, tab: t, chat, line: '', lastCmd: '', outTail: '', errorSeen: false };
-    window.gibson.open(id, t.opts);
+    const p = { id, el, term, search, tab: t, chat, line: '', lastCmd: '', outTail: '', errorSeen: false, lastOut: 0, cmdAt: 0 };
+    window.gibson.open(id, { ...t.opts, from });
+    // Pastes go through the guard, whichever way they arrive (keys, menu, middle click).
+    el.addEventListener('paste', (e) => { e.preventDefault(); e.stopImmediatePropagation(); pasteInto(p, e.clipboardData.getData('text/plain')); }, true);
     const doFit = () => { try { fit.fit(); window.gibson.resize(id, term.cols, term.rows); } catch { /* hidden */ } };
-    p.ro = new ResizeObserver(doFit); p.ro.observe(el); doFit();
+    p.fit = doFit; p.ro = new ResizeObserver(doFit); p.ro.observe(el); doFit();
     term.textarea.addEventListener('focus', () => setFocus(p));
     // At Enter the command is read off the screen (typedLine), so history recall and tab
     // completion count. p.line, rebuilt from keystrokes, covers the moment before the
@@ -108,7 +150,8 @@
         nyxChat(p, cmd.slice(3).trim()); p.line = '';
         return;
       }
-      window.gibson.write(id, d);
+      if (p.tab.broadcast) for (const x of p.tab.panes) window.gibson.write(x.id, d); // type into every pane
+      else window.gibson.write(id, d);
       if (d === '\r') { onCommand(p, cmd); p.line = ''; }
       else if (d === '\x7f') p.line = p.line.slice(0, -1);
       else if (d === '\x03') p.line = '';
@@ -130,6 +173,62 @@
     const m = /^[^>$#%]*[>$#%] (.*)$/.exec(text);
     return m ? m[1] : null;
   }
+  // Clickable paths: name.ext, dir/name.ext, C:\x\y.ext, with :line or :line:col or (line,col).
+  // Only real files under the pane's folder become links (main.js checks); a click opens the
+  // editor at that line.
+  const PATHS = /(?:[A-Za-z]:)?(?:[\w.~@+-]*[\\/])*[\w.@+-]*\.[A-Za-z][\w]{0,7}(?:[:(]\d+(?:[:,]\d+)?\)?)?/g;
+  function fileLinks(term, id) {
+    term.registerLinkProvider({
+      provideLinks(y, cb) {
+        const text = term.buffer.active.getLine(y - 1)?.translateToString(true) || '', found = [];
+        for (const m of text.matchAll(PATHS)) {
+          if (/[/:]/.test(text[m.index - 1] || '') || /^[.\d]+$/.test(m[0]) || found.length > 20) continue; // URLs belong to the web-links addon
+          const [, file, line, col] = /^(.*?)(?:[:(](\d+)(?:[:,](\d+))?\)?)?$/.exec(m[0]);
+          found.push({ file, line: Number(line) || 0, col: Number(col) || 0, x: m.index, len: m[0].length });
+        }
+        if (!found.length) return cb(undefined);
+        window.gibson.linkCheck(id, found.map((f) => f.file)).then((ok) => cb(found.filter((_, i) => ok[i]).map((f) => ({
+          range: { start: { x: f.x + 1, y }, end: { x: f.x + f.len, y } }, text: f.file,
+          activate: () => window.gibson.linkOpen(id, f.file, f.line, f.col),
+        }))));
+      },
+    });
+  }
+  // More than one line asks first: a stray newline in a paste runs whatever came before it.
+  function pasteInto(p, text) {
+    if (!text) return;
+    const lines = text.replace(/\r?\n$/, '').split(/\r?\n/).length;
+    if (cfg.pasteGuard !== false && lines > 1 && !confirm(`Paste ${lines} lines into the shell? Each line runs as it lands.`)) return;
+    p.term.paste(text);
+  }
+  // Find in scrollback: a bar over the top of the focused pane. Enter next, Shift+Enter back, Esc shuts.
+  const FIND_DECOR = { matchBackground: '#ff2e8855', activeMatchBackground: '#ffc448aa', matchOverviewRuler: '#ff2e88', activeMatchColorOverviewRuler: '#ffc448' };
+  function openFind(p) {
+    let bar = p.el.querySelector('.findbar');
+    if (!bar) {
+      bar = document.createElement('div'); bar.className = 'findbar';
+      bar.innerHTML = '<input placeholder="find"><span class="count"></span><button data-d="-1" title="previous (Shift+Enter)">&#9650;</button><button data-d="1" title="next (Enter)">&#9660;</button><button data-d="0" title="close (Esc)">&times;</button>';
+      p.el.appendChild(bar);
+      const inp = bar.firstChild, count = bar.children[1];
+      const go = (dir) => { const o = { decorations: FIND_DECOR }; if (dir < 0) p.search.findPrevious(inp.value, o); else p.search.findNext(inp.value, o); };
+      const shut = () => { p.search.clearDecorations(); bar.remove(); p.term.focus(); };
+      p.search.onDidChangeResults(({ resultIndex, resultCount }) => { count.textContent = resultCount ? `${resultIndex + 1}/${resultCount}` : inp.value ? 'none' : ''; });
+      inp.oninput = () => go(1);
+      inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') go(e.shiftKey ? -1 : 1); else if (e.key === 'Escape') shut(); };
+      for (const b of bar.querySelectorAll('button')) b.onclick = () => { const d = Number(b.dataset.d); if (d) go(d); else shut(); };
+    }
+    const inp = bar.firstChild, sel = p.term.getSelection();
+    if (sel && !sel.includes('\n')) inp.value = sel;
+    inp.focus(); inp.select();
+  }
+  // Text size for every pane, remembered.
+  function setFont(size) {
+    cfg.fontSize = TERM_OPTS.fontSize = Math.max(8, Math.min(36, size));
+    for (const x of allPanes()) { x.term.options.fontSize = cfg.fontSize; x.fit(); }
+    window.gibson.save('fontSize', cfg.fontSize);
+  }
+  addEventListener('wheel', (e) => { if (e.ctrlKey) { e.preventDefault(); setFont(cfg.fontSize + (e.deltaY < 0 ? 1 : -1)); } }, { passive: false });
+
   function closePane(p) {
     p.ro.disconnect(); p.term.dispose(); p.el.remove(); window.gibson.close(p.id);
     p.tab.panes.splice(p.tab.panes.indexOf(p), 1);
@@ -145,15 +244,17 @@
   // Growing adds panes; shrinking closes the newest ones, never the focused one.
   function setPanes(n) {
     n = Math.max(1, Math.min(4, n));
-    while (tab.panes.length < n) makePane(tab);
+    while (tab.panes.length < n) makePane(tab, focused && focused.id);
     while (tab.panes.length > n) closePane(tab.panes.slice().reverse().find((p) => p !== focused));
-    tab.el.className = 'tab n' + n; label(tab);
+    tab.el.className = 'tab n' + n; tab.zoom = false; for (const x of tab.panes) x.el.classList.remove('zoom');
+    if (n < 2) tab.broadcast = false;
+    layout(tab); label(tab);
     focused.term.focus();
   }
 
   window.gibson.onData((id, d) => {
     const p = allPanes().find((x) => x.id === id); if (!p) return;
-    p.term.write(d); act.output(d.length);
+    p.term.write(d); act.output(d.length); p.lastOut = Date.now();
     const plain = d.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07/g, '');
     p.outTail = (p.outTail + plain).slice(-2000);
     if (!p.errorSeen && p.lastCmd && /(error|not recognized|command not found|fatal:|exception|failed|denied)/i.test(plain)) {
@@ -162,7 +263,7 @@
   });
 
   function onCommand(p, cmd) {
-    p.lastCmd = cmd; p.errorSeen = false;
+    p.lastCmd = cmd; p.errorSeen = false; p.cmdAt = cmd ? Date.now() : 0;
     window.gibson.line(p.id, cmd);
     if (NYX_KIND(cmd) === 'cd') setTimeout(async () => {
       worldEnv.fs = await window.gibson.listDir(p.id); go('files'); Worlds.refreshFiles();
@@ -193,7 +294,7 @@
   }
 
   if (B.startTabs.length && !B.shot) { // the saved start tabs
-    for (const s of B.startTabs) { const t = makeTab({ profile: s.profile, cwd: s.cwd, name: s.name }); if (s.panes > 1) { switchTab(t); setPanes(s.panes); } }
+    for (const s of B.startTabs) { const t = makeTab({ profile: s.profile, cwd: s.cwd, name: s.name, color: s.color }); if (s.panes > 1) { switchTab(t); setPanes(s.panes); } }
     switchTab(tabs[0]);
   } else switchTab(makeTab());
   if (B.panes > 1) setPanes(B.panes);
@@ -201,19 +302,31 @@
   if (B.tabs > 1) switchTab(tabs[0]);
 
   // --- NYX --------------------------------------------------------------------
-  const scrollBase = '      GIBSON  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  type  nyx <message>  to talk to her  ctrl+shift+O see-through  ctrl+shift+F frame  ctrl+shift+S hide this scroller  ctrl+shift+L hide the logo  ctrl+shift+D data packets  ctrl+shift+J your own music  ctrl+shift+P play/pause  ctrl+shift+[ ] tracks  right-click for the menu  F11 fullscreen  ::  ';
-  let scroll = scrollBase;
+  // The scroller: greetz (a few at a time, rotating), the keys, and NYX's last line.
+  const GREETZ = ['f0rkz', 'sp00nz', 'the S1LV3RWAREZ crew', 'Zero Cool', 'Acid Burn', 'Cereal Killer', 'Lord Nikon', 'Phantom Phreak', 'Razor & Blade',
+    'everyone at 2600', 'the #hackers regulars', 'all the sysops still running a BBS', 'whoever wrote the first keygen music', 'NOT the Plague'];
+  const KEYS = 'ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  ctrl+shift+F find  ctrl+= bigger text  type  nyx <message>  to talk to her  dial 555-0199 for the BBS  ctrl+shift+O see-through  ctrl+shift+U frame  ctrl+shift+S hide this scroller  ctrl+shift+L hide the logo  ctrl+shift+D data packets  ctrl+shift+J your own music  ctrl+shift+P play/pause  ctrl+shift+[ ] tracks  right-click for the menu  F11 fullscreen';
+  let greet = 0, nyxTail = '';
+  setInterval(() => { greet = (greet + 3) % GREETZ.length; }, 45000);
+  const scrollText = () => {
+    const g = [0, 1, 2].map((i) => GREETZ[(greet + i) % GREETZ.length]);
+    return `      GIBSON  ::  NYX IS WATCHING  ::  greetz to ${g[0]}, ${g[1]} and ${g[2]}  ::  hack the planet  ::  ${KEYS}  ::  ${nyxTail}`;
+  };
+  // 1337 5p34k, when NYX is in the mood (right-click > NYX speaks 1337). Not every letter: it stays readable.
+  const LEET = { a: '4', e: '3', i: '1', o: '0', s: '5', t: '7', l: '1', g: '9', b: '8' };
+  const leet = (s) => s.replace(/[aeiostlgb]/gi, (c) => (Math.random() < 0.65 ? LEET[c.toLowerCase()] : c));
   const nyx = new Nyx(cfg, {
     info: () => ({ user: B.user, host: B.host, hour: new Date().getHours(), activity: act.level().toFixed(2), cwd: (worldEnv.fs && worldEnv.fs.cwd) || B.cwd }),
     llm: (ev) => window.gibson.llm(ev),
-    say(text, mood, world) {
+    say(said, mood, world) {
+      const text = cfg.nyx.leet ? leet(said) : said;
       const el = $('nyxtext'); el.textContent = ''; let i = 0;
       $('nyx').classList.remove('glitch'); void $('nyx').offsetWidth; $('nyx').classList.add('glitch');
       const iv = setInterval(() => { el.textContent = text.slice(0, ++i); if (i >= text.length) clearInterval(iv); }, 28);
-      scroll = scrollBase + `NYX SAYS: ${text.toUpperCase()}  ::  `;
+      nyxTail = `NYX SAYS: ${text.toUpperCase()}  ::  `;
       go(world);
       if (cfg.nyx.voice && window.speechSynthesis) {
-        const u = new SpeechSynthesisUtterance(text); u.pitch = 0.55; u.rate = 1.02;
+        const u = new SpeechSynthesisUtterance(said); u.pitch = 0.55; u.rate = 1.02;
         const v = speechSynthesis.getVoices().find((x) => /zira|female|aria|jenny/i.test(x.name)); if (v) u.voice = v;
         speechSynthesis.cancel(); speechSynthesis.speak(u);
       }
@@ -251,7 +364,7 @@
   });
   if (B.world || cfg.world) Worlds.go(B.world || cfg.world);
   Fx.start({ logo: $('logo'), scroller: $('scroller'), rain: $('rain'), smoke: $('smoke') },
-    () => ({ pulse, level: act.level(), smoking: act.busyOut > 4, cig: cfg.cigarette !== false, scroll }));
+    () => ({ pulse, level: act.level(), smoking: act.busyOut > 4, cig: cfg.cigarette !== false, scroll: scrollText() }));
 
   // --- hotkeys + right-click menu: main.js catches the keys, both land here ----
   const OPACITY = [1, 0.86, 0.7, 0.5, 0.3, 0.15, 0];
@@ -304,7 +417,15 @@
   function action(a) {
     const t = focused.term;
     if (a === 'copy') navigator.clipboard.writeText(t.getSelection());
-    else if (a === 'paste') navigator.clipboard.readText().then((s) => t.paste(s));
+    else if (a === 'paste') { const p = focused; navigator.clipboard.readText().then((s) => pasteInto(p, s)); }
+    else if (a === 'find') return openFind(focused);
+    else if (a.startsWith('font:')) setFont(a === 'font:up' ? cfg.fontSize + 1 : a === 'font:down' ? cfg.fontSize - 1 : B.defaults.fontSize);
+    else if (a === 'broadcast') { if (tab.panes.length > 1) tab.broadcast = !tab.broadcast; tab.el.classList.toggle('broadcast', !!tab.broadcast); label(tab); }
+    else if (a === 'zoompane') { if (tab.panes.length > 1) { tab.zoom = !tab.zoom; for (const x of tab.panes) x.el.classList.toggle('zoom', tab.zoom && x === focused); layout(tab); } }
+    else if (a === 'evenpanes') { tab.c = tab.r = 0.5; layout(tab); }
+    else if (a.startsWith('tabcolor:')) { tab.opts = { ...tab.opts, color: a.slice(9) || undefined }; label(tab); }
+    else if (a === 'leet') { cfg.nyx.leet = !cfg.nyx.leet; window.gibson.save('nyxLeet', cfg.nyx.leet); nyx.ctx.say(cfg.nyx.leet ? 'Elite mode. Try to keep up, newbie.' : 'Plain speech. For the slow.', 'playful'); }
+    else if (a === 'pasteguard') { cfg.pasteGuard = cfg.pasteGuard === false; window.gibson.save('pasteGuard', cfg.pasteGuard); }
     else if (a === 'music') {
       cfg.music.on = !cfg.music.on;
       if (jukeOn()) { if (cfg.music.on) juke.play(); else juke.pause(); showPlayer(); } else if (cfg.music.on) startMusic(); else if (music) music.stop();
@@ -314,7 +435,7 @@
     else if (a === 'logo') { setLogo(!cfg.logo); window.gibson.save('logo', cfg.logo); }
     else if (a === 'cigarette') { cfg.cigarette = cfg.cigarette === false; window.gibson.save('cigarette', cfg.cigarette); }
     else if (a === 'nyxworlds') { cfg.nyxWorlds = cfg.nyxWorlds === false; window.gibson.save('nyxWorlds', cfg.nyxWorlds); }
-    else if (a === 'tabs:save') { window.gibson.saveTabs(tabs.map((x) => ({ id: x.panes[0].id, panes: x.panes.length, name: x.opts.name }))); nyx.ctx.say(`${tabs.length} tab${tabs.length > 1 ? 's' : ''} saved. They will be waiting next time.`, 'tender'); }
+    else if (a === 'tabs:save') { window.gibson.saveTabs(tabs.map((x) => ({ id: x.panes[0].id, panes: x.panes.length, name: x.opts.name, color: x.opts.color }))); nyx.ctx.say(`${tabs.length} tab${tabs.length > 1 ? 's' : ''} saved. They will be waiting next time.`, 'tender'); }
     else if (a === 'packets') { cfg.packets = cfg.packets === false; window.gibson.save('packets', cfg.packets); }
     else if (a === 'tempo') { cfg.music.mode = cfg.music.mode === 'reactive' ? 'fixed' : 'reactive'; nyx.ctx.say(`Tempo ${cfg.music.mode === 'fixed' ? 'locked at ' + cfg.music.bpm : 'follows your hands'}.`, 'playful'); }
     else if (a === 'nyx') { cfg.nyx.on = !cfg.nyx.on; $('nyx').style.opacity = cfg.nyx.on ? 1 : 0.3; }
@@ -328,8 +449,8 @@
       setOpacity(focused, o); cfg.opacity = o; window.gibson.save('opacity', o);
     }
     else if (a.startsWith('panes:')) return setPanes(Number(a.slice(6)));
-    else if (a === 'newtab') return switchTab(makeTab());
-    else if (a.startsWith('newtab:')) return switchTab(makeTab({ profile: a.slice(7) }));
+    else if (a === 'newtab') return switchTab(makeTab({ from: focused && focused.id }));
+    else if (a.startsWith('newtab:')) return switchTab(makeTab({ profile: a.slice(7), from: focused && focused.id }));
     else if (a === 'closetab') return closeTab(tab);
     else if (a === 'renametab') return renameTab(tab);
     else if (a === 'nexttab') return stepTab(1);
@@ -344,14 +465,29 @@
     e.preventDefault();
     const p = tab.panes.find((x) => x.el.contains(e.target)); if (p) p.term.focus();
     window.gibson.menu({
-      selection: !!focused.term.getSelection(), panes: tab.panes.length, tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
+      selection: !!focused.term.getSelection(), panes: tab.panes.length, zoomed: !!tab.zoom, broadcast: !!tab.broadcast, tabColor: tab.opts.color || '', tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
       worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
-      music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
+      leet: !!cfg.nyx.leet, music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
       source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false, packets: cfg.packets !== false,
     });
   });
 
   // --- the loop ---------------------------------------------------------------
+  // A command is done when the output has gone quiet and the cursor sits at an empty prompt.
+  // ponytail: prompt-shape heuristic, like typedLine; OSC 133 would be exact.
+  let doneCheck = 0;
+  function finishedCommands() {
+    const now = Date.now(), after = (cfg.notifyAfterSec ?? 10) * 1000;
+    for (const p of allPanes()) {
+      if (!p.cmdAt || now - p.lastOut < 1200) continue;
+      const line = typedLine(p); if (line === null || line.trim()) continue;
+      const took = now - p.cmdAt; p.cmdAt = 0;
+      if (!after || took < after || (document.hasFocus() && p.tab === tab)) continue; // you saw it finish
+      const secs = Math.round(took / 1000), dur = secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`;
+      if (p.tab !== tab) { p.tab.done = true; label(p.tab); }
+      if (!B.shot) new Notification(p.errorSeen ? 'GIBSON: finished with errors' : 'GIBSON: finished', { body: `${p.lastCmd}  (${dur})`, silent: false }).onclick = () => { window.gibson.focusWindow?.(); switchTab(p.tab); };
+    }
+  }
   let lastT = performance.now(), idleSaid = false, compileSaid = false, streakAt = 0, lateSaid = false;
   setInterval(() => {
     const now = performance.now(), dt = (now - lastT) / 1000; lastT = now;
@@ -369,6 +505,7 @@
     if (act.busyOut > 4 && !compileSaid) { compileSaid = true; nyx.event('compile', { cmd: focused.lastCmd }, true); go('pipes'); }
     if (compileSaid && act.busyOut === 0) { compileSaid = false; nyx.event('done', { cmd: focused.lastCmd, output: focused.outTail }, true); }
     if (lvl > 0.85 && now - streakAt > 60000) { streakAt = now; nyx.event('streak', {}, false); }
+    if (now - doneCheck > 500) { doneCheck = now; finishedCommands(); }
     const h = new Date().getHours();
     if (!lateSaid && h >= 1 && h < 5 && act.idle < 2) { lateSaid = true; nyx.event('late', {}, true); }
     if (Math.random() < dt * (1 / 100 + lvl / 35)) Fx.rain(1.5 + Math.random() * 2.5);
