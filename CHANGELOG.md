@@ -4,6 +4,38 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-17
+
+### Added
+- Terminal:
+  - New panes and tabs open in the focused pane's folder (`splitHere`).
+  - Find in scrollback (`Ctrl+Shift+F`).
+  - Text size with `Ctrl+=` / `Ctrl+-` / `Ctrl+0` and Ctrl+wheel, remembered.
+  - Tabs drag to reorder and take a colour; start tabs keep it.
+  - Drag the gaps between panes to resize them.
+  - Zoom one pane (`Ctrl+Shift+Z`).
+  - Type into every pane at once (`Ctrl+Shift+A`).
+  - A notification and a tab dot when a long command finishes out of sight (`notifyAfterSec`).
+  - Clickable `file:line` paths open your editor (`editor`; VS Code by default when installed).
+  - A paste guard for multi-line pastes (`pasteGuard`).
+  - A quake-style global summon key (`quake`, default `Alt+``).
+- Hacker commands, kept from the shell (`hackerCommands: false` to turn them off):
+  - `dial <number>`: a BBS in its own tab. It has message bases, file areas, who's online, chat with
+    NYX, and a door game, LEGEND OF THE NEON DRAGON.
+  - `wardial`, `nfo <file>` (CP437, with a chiptune), `scan <host>` (theatre only) and `cookie`.
+- The Da Vinci red alert on dangerous commands.
+- The cookie monster may turn up after a long break (`eggs`).
+- IRC lobby beside the terminal (`Ctrl+Shift+I`): a simulated #hackers with the movie's cast and
+  NYX as op, reacting to your commands, builds, errors, news and music. A real server can be
+  configured instead (`irc`).
+- Jukebox: tracker modules (.mod .xm .s3m .it and more) through libopenmpt (chiptune3), and a
+  Winamp-style player with a spectrum analyser.
+- Worlds: KEYGEN (when a build finishes), THE GARBAGE FILE, GIBSON TOWERS.
+- NYX speaks 1337 (right-click menu). Greetz rotate in the scroller.
+
+### Changed
+- Framed/full window moved to `Ctrl+Shift+U`; `Ctrl+Shift+F` is find now.
+
 ## [0.9.0] - 2026-10-17
 
 ### Added

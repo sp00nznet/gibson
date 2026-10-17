@@ -143,11 +143,13 @@
       const shown = enter ? typedLine(p) : null;
       const raw = shown && shown.trim() ? shown : enter ? p.line : '';
       const cmd = raw.trim();
-      if (enter && /^nyx(\s|$)/i.test(cmd)) { // `nyx <message>` is for her, not the shell
+      // GIBSON's own commands (`nyx <message>`, `dial 555-0199`, `nfo file`...) never reach the shell.
+      const own = enter && /^(nyx|dial|wardial|nfo|scan|cookie)(\s|$)/i.exec(cmd);
+      if (own && (own[1].toLowerCase() === 'nyx' || cfg.hackerCommands !== false)) {
         // Erase the line with backspaces rather than Ctrl+C, which leaves a ^C behind.
         // Backspace means the same in PowerShell, cmd, bash and zsh.
-        window.gibson.write(id, '\x7f'.repeat(raw.length));
-        nyxChat(p, cmd.slice(3).trim()); p.line = '';
+        window.gibson.write(id, '\x7f'.repeat(raw.length)); p.line = '';
+        builtin(p, own[1].toLowerCase(), cmd.slice(own[1].length).trim());
         return;
       }
       if (p.tab.broadcast) for (const x of p.tab.panes) window.gibson.write(x.id, d); // type into every pane
@@ -258,7 +260,7 @@
     const plain = d.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07/g, '');
     p.outTail = (p.outTail + plain).slice(-2000);
     if (!p.errorSeen && p.lastCmd && /(error|not recognized|command not found|fatal:|exception|failed|denied)/i.test(plain)) {
-      p.errorSeen = true; Worlds.signal('error'); nyx.event('error', { cmd: p.lastCmd, output: p.outTail }, true);
+      p.errorSeen = true; Worlds.signal('error'); nyx.event('error', { cmd: p.lastCmd, output: p.outTail }, true); ircPanel.event('error', p.lastCmd);
     }
   });
 
@@ -267,13 +269,41 @@
     window.gibson.line(p.id, cmd);
     if (NYX_KIND(cmd) === 'cd') setTimeout(async () => {
       worldEnv.fs = await window.gibson.listDir(p.id); go('files'); Worlds.refreshFiles();
-      p.tab.cwdName = baseName(worldEnv.fs.cwd); label(p.tab); refreshGit(p);
+      p.tab.cwdName = baseName(worldEnv.fs.cwd); label(p.tab); refreshGit(p); ircPanel.event('cd', p.tab.cwdName);
     }, 250);
     if (/^git\b/i.test(cmd)) setTimeout(() => refreshGit(p), 1200); // new commits ignite in the galaxy
     if (cmd) setTimeout(() => { if (!p.errorSeen && p.lastCmd === cmd) Worlds.signal('ok'); }, 1500);
     if (/hack\s+the\s+planet/i.test(cmd) && !B.world) Worlds.go('hack');
     $('frame').style.setProperty('--warp', 1); warp = 1; // the Enter lunge
     nyx.command(cmd);
+    if (cmd) ircPanel.event(/^git\s+commit\b/i.test(cmd) ? 'commit' : NYX_KIND(cmd), cmd);
+    if (NYX_KIND(cmd) === 'danger') Theatre.alert(null, { cmd }); // the Da Vinci treatment
+  }
+
+  // The set pieces (renderer/theatre.js) and the BBS (bbs/bbs.js), each a command of its own.
+  function builtin(p, name, arg) {
+    const back = () => p.term.focus();
+    if (name === 'nyx') return nyxChat(p, arg);
+    if (name === 'dial') return dialBbs(arg || '555-0199');
+    if (name === 'scan') return Theatre.scan(p.el, arg || 'gibson.ellingson.net', back);
+    if (name === 'cookie') return Theatre.cookie(p.el, back);
+    if (name === 'wardial') return Theatre.wardial(p.el, arg || '555', back, { onCarrier: (n) => nyx.ctx.say(`Carrier at ${n}. Type  dial ${n}  if you dare.`, 'curious') });
+    if (name === 'nfo') {
+      if (!arg) return nyx.ctx.say('nfo what? Give me a file name, insect.', 'taunting');
+      window.gibson.readFile(p.id, arg.replace(/^["']|["']$/g, '')).then((buf) => {
+        if (buf) Theatre.nfo(p.el, new Uint8Array(buf), arg, back); else nyx.ctx.say(`No ${arg} here. Or it is too big to be an nfo.`, 'taunting');
+      });
+    }
+  }
+  // `dial <number>`: the modem sings, and the board answers in a tab of its own.
+  function dialBbs(number) {
+    try {
+      const d = new Techno(); d.volume(B.shot ? 0 : cfg.music.volume);
+      const len = d.dialup(number.replace(/\D/g, '') || '5550199', B.shot ? 0 : 1);
+      setTimeout(() => d.ctx.close(), len * 1000 + 500);
+    } catch { /* no audio device */ }
+    switchTab(makeTab({ bbs: number, name: 'BBS ' + number }));
+    ircPanel.event('cd', 'a BBS');
   }
 
   // Talking to NYX. The exchange shows in an overlay on the pane, not in the terminal
@@ -305,7 +335,7 @@
   // The scroller: greetz (a few at a time, rotating), the keys, and NYX's last line.
   const GREETZ = ['f0rkz', 'sp00nz', 'the S1LV3RWAREZ crew', 'Zero Cool', 'Acid Burn', 'Cereal Killer', 'Lord Nikon', 'Phantom Phreak', 'Razor & Blade',
     'everyone at 2600', 'the #hackers regulars', 'all the sysops still running a BBS', 'whoever wrote the first keygen music', 'NOT the Plague'];
-  const KEYS = 'ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  ctrl+shift+F find  ctrl+= bigger text  type  nyx <message>  to talk to her  dial 555-0199 for the BBS  ctrl+shift+O see-through  ctrl+shift+U frame  ctrl+shift+S hide this scroller  ctrl+shift+L hide the logo  ctrl+shift+D data packets  ctrl+shift+J your own music  ctrl+shift+P play/pause  ctrl+shift+[ ] tracks  right-click for the menu  F11 fullscreen';
+  const KEYS = 'ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+I irc  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  ctrl+shift+F find  ctrl+= bigger text  type  nyx <message>  to talk to her  dial 555-0199 for the BBS  ctrl+shift+O see-through  ctrl+shift+U frame  ctrl+shift+S hide this scroller  ctrl+shift+L hide the logo  ctrl+shift+D data packets  ctrl+shift+J your own music  ctrl+shift+P play/pause  ctrl+shift+[ ] tracks  right-click for the menu  F11 fullscreen';
   let greet = 0, nyxTail = '';
   setInterval(() => { greet = (greet + 3) % GREETZ.length; }, 45000);
   const scrollText = () => {
@@ -332,6 +362,15 @@
       }
     },
   });
+
+  // --- the IRC lobby (renderer/irc.js): a fake #hackers unless config.json says real ---
+  const ircPanel = IrcPanel.create($('irc'), {
+    mode: (cfg.irc && cfg.irc.mode) || 'fake', nick: (cfg.irc && cfg.irc.nick) || B.user,
+    ask: cfg.llm.provider === 'none' ? null : (text, history) => window.gibson.llm({ kind: 'chat', message: text, history, ...nyx.ctx.info() }).then((l) => l && l.text),
+    onFocusTerminal: () => focused.term.focus(),
+  });
+  if (cfg.ircOpen || B.irc) ircPanel.show();
+  Theatre.volume = B.shot ? 0 : cfg.music.volume;
 
   // --- worlds + fx ------------------------------------------------------------
   worldEnv.fs = await window.gibson.listDir(focused.id);
@@ -360,7 +399,7 @@
     const fresh = items.filter((i) => !titles.has(i.title)), first = !worldEnv.news;
     for (const i of items) titles.add(i.title);
     worldEnv.news = items;
-    if (!first && fresh.length) { Worlds.signal('news'); nyx.event('news', { headline: fresh[0].title, detail: fresh[0].source }, false); }
+    if (!first && fresh.length) { Worlds.signal('news'); nyx.event('news', { headline: fresh[0].title, detail: fresh[0].source }, false); ircPanel.event('news', fresh[0].title); }
   });
   if (B.world || cfg.world) Worlds.go(B.world || cfg.world);
   Fx.start({ logo: $('logo'), scroller: $('scroller'), rain: $('rain'), smoke: $('smoke') },
@@ -378,7 +417,7 @@
   setLogo(cfg.logo !== false);
 
   // --- the jukebox: the user's own folder instead of the synth (renderer/jukebox.js) ---
-  const juke = new Jukebox((t) => { $('track').textContent = t; nyx.event('track', { detail: t }, false); });
+  const juke = new Jukebox((t) => { $('track').textContent = t; nyx.event('track', { detail: t }, false); ircPanel.event('track', t); });
   juke.shuffle = cfg.music.shuffle !== false; juke.volume(B.shot ? 0 : cfg.music.volume); // shots stay silent
   const jukeOn = () => cfg.music.source === 'folder' && juke.tracks.length > 0;
   const saveMusic = () => window.gibson.save('music', { source: cfg.music.source, folder: cfg.music.folder, shuffle: juke.shuffle, volume: cfg.music.volume, on: cfg.music.on });
@@ -388,7 +427,7 @@
   }
   function useSource(src) { // 'synth' or 'folder'; the other one goes quiet
     cfg.music.source = src;
-    if (jukeOn()) { if (music) music.stop(); if (cfg.music.on && !B.mute) juke.play(); }
+    if (jukeOn()) { if (music) music.stop(); if ((cfg.music.on || B.shot) && !B.mute) juke.play(); }
     else { cfg.music.source = 'synth'; juke.pause(); startMusic(); }
     showPlayer(); saveMusic();
   }
@@ -424,6 +463,7 @@
     else if (a === 'zoompane') { if (tab.panes.length > 1) { tab.zoom = !tab.zoom; for (const x of tab.panes) x.el.classList.toggle('zoom', tab.zoom && x === focused); layout(tab); } }
     else if (a === 'evenpanes') { tab.c = tab.r = 0.5; layout(tab); }
     else if (a.startsWith('tabcolor:')) { tab.opts = { ...tab.opts, color: a.slice(9) || undefined }; label(tab); }
+    else if (a === 'irc') { ircPanel.toggle(); window.gibson.save('ircOpen', ircPanel.visible); if (ircPanel.visible) return ircPanel.focus(); }
     else if (a === 'leet') { cfg.nyx.leet = !cfg.nyx.leet; window.gibson.save('nyxLeet', cfg.nyx.leet); nyx.ctx.say(cfg.nyx.leet ? 'Elite mode. Try to keep up, newbie.' : 'Plain speech. For the slow.', 'playful'); }
     else if (a === 'pasteguard') { cfg.pasteGuard = cfg.pasteGuard === false; window.gibson.save('pasteGuard', cfg.pasteGuard); }
     else if (a === 'music') {
@@ -467,7 +507,7 @@
     window.gibson.menu({
       selection: !!focused.term.getSelection(), panes: tab.panes.length, zoomed: !!tab.zoom, broadcast: !!tab.broadcast, tabColor: tab.opts.color || '', tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
       worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
-      leet: !!cfg.nyx.leet, music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
+      irc: ircPanel.visible, leet: !!cfg.nyx.leet, music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
       source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false, packets: cfg.packets !== false,
     });
   });
@@ -488,22 +528,26 @@
       if (!B.shot) new Notification(p.errorSeen ? 'GIBSON: finished with errors' : 'GIBSON: finished', { body: `${p.lastCmd}  (${dur})`, silent: false }).onclick = () => { window.gibson.focusWindow?.(); switchTab(p.tab); };
     }
   }
-  let lastT = performance.now(), idleSaid = false, compileSaid = false, streakAt = 0, lateSaid = false;
+  let cookieDone = false, lastT = performance.now(), idleSaid = false, compileSaid = false, streakAt = 0, lateSaid = false;
   setInterval(() => {
     const now = performance.now(), dt = (now - lastT) / 1000; lastT = now;
     act.tick(dt);
     const lvl = act.level();
-    if (jukeOn()) pulse = Math.max(juke.pulse(), pulse - dt * 3); // the beat of your own track
+    if (jukeOn()) { pulse = Math.max(juke.pulse(), pulse - dt * 3); juke.draw($('player')); } // the beat of your own track, and the player skin
     else if (music) { music.level = lvl; music.bpm = act.glide(dt, cfg.music); pulse = music.on ? music.pulse() : 0; }
     else pulse = Math.max(0, pulse - dt * 3);
     warp = Math.max(lvl, warp - dt * 2.5);
     const fr = $('frame').style; fr.setProperty('--glow', pulse.toFixed(3)); fr.setProperty('--warp', warp.toFixed(3));
     $('status').textContent = `${jukeOn() ? (juke.playing ? 'JUKEBOX' : 'PAUSED') : Math.round(act.bpm) + ' BPM'}  ${'▮'.repeat(Math.round(lvl * 10)).padEnd(10, '▯')}\n${Worlds.label()}  //  ${B.user}@${B.host}`;
 
-    if (act.idle > 75 && !idleSaid) { idleSaid = true; nyx.event('idle', {}, true); go('maze'); } // the screensaver kicks in
-    if (act.idle < 1) idleSaid = false;
-    if (act.busyOut > 4 && !compileSaid) { compileSaid = true; nyx.event('compile', { cmd: focused.lastCmd }, true); go('pipes'); }
-    if (compileSaid && act.busyOut === 0) { compileSaid = false; nyx.event('done', { cmd: focused.lastCmd, output: focused.outTail }, true); }
+    if (act.idle > 75 && !idleSaid) { idleSaid = true; nyx.event('idle', {}, true); go('maze'); ircPanel.event('idle'); } // the screensaver kicks in
+    if (act.idle < 1) {
+      // Back from a long idle, once a session, maybe: the cookie monster wants feeding.
+      if (idleSaid && cfg.eggs !== false && !cookieDone && performance.now() > 20 * 60000 && Math.random() < 0.15) { cookieDone = true; Theatre.cookie(focused.el, () => focused.term.focus()); }
+      idleSaid = false;
+    }
+    if (act.busyOut > 4 && !compileSaid) { compileSaid = true; nyx.event('compile', { cmd: focused.lastCmd }, true); go('pipes'); ircPanel.event('compile'); }
+    if (compileSaid && act.busyOut === 0) { compileSaid = false; nyx.event('done', { cmd: focused.lastCmd, output: focused.outTail }, true); ircPanel.event('done'); }
     if (lvl > 0.85 && now - streakAt > 60000) { streakAt = now; nyx.event('streak', {}, false); }
     if (now - doneCheck > 500) { doneCheck = now; finishedCommands(); }
     const h = new Date().getHours();
@@ -540,7 +584,8 @@
   if (B.shot) { // headless screenshot: give it something to look at
     if (tab.panes.length > 1) tab.panes.forEach((p, i) => setOpacity(p, [0.86, 0.55, 0.3, 0.7][i]));
     setTimeout(() => tab.panes.forEach((p, i) => window.gibson.write(p.id, demoCmd(i))), 1500);
-    if (B.chat) setTimeout(() => { const t = tab.panes[0].term; for (const ch of `nyx ${B.chat}`) t.input(ch); }, 4000); // the real keystroke path
+    if (B.chat) setTimeout(() => { const t = tab.panes[0].term; for (const ch of `nyx ${B.chat}\r`) t.input(ch); }, 4000); // the real keystroke path
+    if (B.cmd) setTimeout(() => { const t = tab.panes[0].term; for (const ch of `${B.cmd}\r`) t.input(ch); }, 3000); // a GIBSON command, typed
     act.keys = 30;
     setInterval(() => { act.key(); act.key(); }, 100);
   }

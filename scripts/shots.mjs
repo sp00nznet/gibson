@@ -10,6 +10,8 @@ const SHOTS = [
   ['tabs', 'city', 2, '--tabs', '3', '--chat', 'are you real?'],
   ['core', 'core', 1], ['bbs', 'bbs', 1], ['ice', 'ice', 1],
   ['net', 'net', 1], ['news', 'news', 1], ['cycles', 'cycles', 1], ['battlezone', 'battlezone', 1], ['toasters', 'toasters', 1],
+  ['keygen', 'keygen', 1], ['garbage', 'garbage', 1], ['towers', 'towers', 1],
+  ['irc', 'city', 1, '--irc'], ['dial', 'grid', 1, '--cmd', 'dial 555-0199'],
   ['newsglobe', 'newsglobe', 1], ['traffic', 'traffic', 1], ['hack', 'hack', 1],
 ];
 for (const [name, world, panes, ...extra] of SHOTS) {

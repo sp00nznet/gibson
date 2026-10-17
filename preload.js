@@ -17,6 +17,12 @@ contextBridge.exposeInMainWorld('gibson', {
   onHotkey: (fn) => ipcRenderer.on('hotkey', (_e, a) => fn(a)),
   menu: (state) => ipcRenderer.send('menu', state),
   shellMenu: () => ipcRenderer.send('menu:shells'),
+  readFile: (id, file) => ipcRenderer.invoke('fs:read', id, file),
+  irc: { // the IRC lobby's real mode (irc.js); fake mode needs none of this
+    connect: () => ipcRenderer.invoke('irc:connect'),
+    command: (line, target) => ipcRenderer.send('irc:command', line, target),
+    onEvent: (fn) => ipcRenderer.on('irc:event', (_e, ev) => fn(ev)),
+  },
   linkCheck: (id, files) => ipcRenderer.invoke('link:check', id, files),
   linkOpen: (id, file, line, col) => ipcRenderer.send('link:open', id, file, line, col),
   saveTabs: (list) => ipcRenderer.send('tabs:save', list),

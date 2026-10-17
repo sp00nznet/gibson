@@ -1,6 +1,6 @@
 {
   "name": "gibson",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "GIBSON: a cracktro terminal. Wireframe worlds, reactive techno, and NYX, the unseen sysop who watches you type.",
   "author": "sp00nznet",
   "license": "MIT",
@@ -8,7 +8,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test/check.mjs",
+    "test": "node test/check.mjs && node test/irc-check.mjs && node test/theatre-check.mjs && node bbs/check.js",
     "shots": "node scripts/shots.mjs",
     "dist": "electron-builder --publish never",
     "icon": "electron scripts/icon.js"
@@ -20,6 +20,7 @@
     "@xterm/addon-web-links": "0.12.0",
     "@xterm/addon-webgl": "0.19.0",
     "@xterm/xterm": "6.0.0",
+    "chiptune3": "0.8.9",
     "node-pty": "1.1.0"
   },
   "devDependencies": {
@@ -38,13 +39,16 @@
       "main.js",
       "llm.js",
       "sysinfo.js",
+      "bbs/**",
+      "irc.js",
       "preload.js",
       "renderer/**",
       "LICENSE",
       "build/icon.png"
     ],
     "asarUnpack": [
-      "node_modules/node-pty/**"
+      "node_modules/node-pty/**",
+      "bbs/**"
     ],
     "npmRebuild": false,
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",

@@ -24,6 +24,11 @@ assert.deepEqual(sysinfo.parseFeed(rss).map((i) => [i.title, i.source]), [['Worm
 const atom = '<feed><title>Reg</title><entry><title type="html">Patch &#8217;em</title><link href="https://y/2"/></entry></feed>';
 assert.deepEqual(sysinfo.parseFeed(atom)[0], { title: 'Patch \u2019em', link: 'https://y/2', source: 'Reg' }, 'Atom');
 
+// --- the jukebox knows a tracker module from a recording ---
+const { Jukebox } = require('../renderer/jukebox.js');
+for (const f of ['a.mod', 'b/C.XM', 'x.s3m', 'y.it', 'z.mptm']) assert.ok(Jukebox.isTracker(f), f);
+for (const f of ['a.mp3', 'mod.wav', 'it']) assert.ok(!Jukebox.isTracker(f), f);
+
 // --- shell profiles ---
 const wsl = sysinfo.wslDistros(Buffer.from('Debian\r\nUbuntu\r\ndocker-desktop\r\n', 'utf16le').toString('utf16le'));
 assert.deepEqual(wsl.map((p) => [p.name, p.args.join(' ')]), [['Debian (WSL)', '-d Debian'], ['Ubuntu (WSL)', '-d Ubuntu']], 'one profile per distro, Docker skipped');

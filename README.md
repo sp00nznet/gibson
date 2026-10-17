@@ -16,10 +16,17 @@ typos, gasps at `rm -rf`, gets bored when you go idle, comments on the news and 
 and changes the world behind your terminal to suit her mood. Type `nyx <anything>` and she answers.
 Plug in a local or hosted LLM and she improvises; without one she has plenty to say anyway.
 
+And the rest of 1995 is in here too: `dial 555-0199` for a BBS with a door game, `wardial` for
+numbers that answer, `nfo` for a release's art with a chiptune, `scan` for some port-scan
+theatre, a `#hackers` IRC lobby pinned beside your shell, tracker music in the jukebox, a keygen
+window, and a Da Vinci red alert when you type `rm -rf`.
+
 It is mostly for fun. But some of it is genuinely handy:
 
-- **It's a proper terminal.** PowerShell, cmd, bash, zsh, WSL; tabs; up to four tiled panes per
-  tab; copy/paste; clickable links; per-pane see-through so the show goes on behind your work.
+- **It's a proper terminal.** PowerShell, cmd, bash, zsh, each WSL distro; tabs you can rename,
+  colour, drag and save; up to four resizable panes per tab; find in scrollback; type into every
+  pane at once; clickable `file:line` links that open your editor; a ping when a long command
+  finishes while you're elsewhere; a paste guard; a quake-style summon key.
 - **NETWATCH** draws every live TCP connection your machine has, labelled by service. A new kind
   of connection flares, and NYX will mention it.
 - **PROCESS HIVE** is a honeycomb of your running programs: height is memory, heat is CPU, and a
@@ -29,7 +36,7 @@ It is mostly for fun. But some of it is genuinely handy:
 
 ## Status
 
-**0.8.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
+**0.10.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
 are produced and smoke-tested by CI, but nobody has lived in them yet.
 
 | | |
@@ -37,7 +44,11 @@ are produced and smoke-tested by CI, but nobody has lived in them yet.
 | Real shell (node-pty), xterm.js 6 with WebGL, links, Unicode 11 | done |
 | Tabs, each with 1 to 4 tiled panes; per-pane opacity; framed or full-window; hideable logo and scroller | done |
 | Talk to NYX from any pane: `nyx <message>` | done |
-| Twenty-five wireframe worlds, five of them live system data or your RSS feeds | done |
+| Twenty-eight wireframe worlds, five of them live system data or your RSS feeds | done |
+| Find, text size, pane resize/zoom, broadcast input, file links, finished-command alerts, paste guard, quake key | done |
+| `dial` a BBS (with a door game), `wardial`, `nfo`, `scan`, the cookie monster, the red alert | done |
+| IRC lobby beside the terminal: a simulated #hackers, or a real server | done (real mode tested against a local server) |
+| Tracker modules (.mod .xm .s3m .it) in the jukebox; a Winamp-style player | done |
 | Shell profiles (PowerShell, PowerShell 7, cmd, WSL, Git Bash, your own); start tabs that reopen in their folders | done |
 | Reactive synth soundtrack, 84 to 162 BPM, following your activity | done |
 | Jukebox: your own music folder, with controls, visuals pumping on its beat | done |
@@ -61,6 +72,9 @@ is anyone's real machine.
 | ![Space battle](docs/screenshots/battle.png) **DEEP SPACE**: fleets trading lasers | ![Data tunnel](docs/screenshots/tunnel.png) **DATASTREAM**: down the wire |
 | ![Flying toasters](docs/screenshots/toasters.png) **FLYING TOASTERS**: and toast, some of it burnt | ![Hack the planet](docs/screenshots/hack.png) **HACK THE PLANET**: the Earth, a Jolly Roger floppy, the words going round |
 | ![World news on a globe](docs/screenshots/newsglobe.png) **WORLD NEWS**: headlines pop up where they happened | ![Your traffic on a globe](docs/screenshots/traffic.png) **TRAFFIC MAP**: your connections arcing out from home |
+| ![A keygen](docs/screenshots/keygen.png) **KEYGEN**: serials, greetz, copper bars; when a build finishes | ![The garbage file](docs/screenshots/garbage.png) **THE GARBAGE FILE**: hunted through the Gibson's tree |
+| ![Dialing a BBS](docs/screenshots/dial.png) **`dial 555-0199`**: a BBS in a tab, with a door game | ![The IRC lobby](docs/screenshots/irc.png) **IRC lobby**: #hackers beside your shell (`Ctrl+Shift+I`) |
+| ![Gibson towers](docs/screenshots/towers.png) **GIBSON TOWERS**: flying the glass canyons | |
 
 Also in the box: THE GRID, NEON CITY, ORBIT, RAVE WAREHOUSE, GIT GALAXY, HIGHWAY, DEEP SEA,
 PROCESS HIVE, 3D PIPES, 3D MAZE and THE STREET.
@@ -147,22 +161,48 @@ Everything below is also on the **right-click menu**.
 | `Ctrl+Shift+T` / `Ctrl+Shift+X` | new tab / close tab (or the `+` button, and the `x` on each tab or a middle-click) |
 | `▾` next to `+` | new tab with another shell: PowerShell, PowerShell 7, cmd, WSL, Git Bash, whatever is installed |
 | double-click a tab | rename it (Enter keeps it, Esc backs out, empty goes back to the folder name); also right-click > Rename tab |
+| drag a tab | move it; right-click > Tab colour to colour it |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | next / previous tab (also `Ctrl+PageDown` / `Ctrl+PageUp`) |
-| `Ctrl+Shift+1`..`4` | that many panes in this tab. Shrinking keeps the focused pane |
-| `Ctrl+Shift+C` / `Ctrl+Shift+V` | copy / paste |
+| `Ctrl+Shift+1`..`4` | that many panes in this tab, opening in the focused pane's folder. Drag the gaps to resize; right-click > Panes > Even out |
+| `Ctrl+Shift+Z` | zoom the focused pane to fill the tab, and back |
+| `Ctrl+Shift+A` | type into every pane in this tab at once (gold borders while it's on) |
+| `Ctrl+Shift+F` | find in scrollback: Enter next, Shift+Enter previous, Esc closes |
+| `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | text bigger / smaller / reset (or Ctrl+mouse wheel); remembered |
+| `Ctrl+Shift+C` / `Ctrl+Shift+V` | copy / paste. More than one line asks first (right-click to turn that off) |
+| click a `file:line` | opens it in your editor at that line (VS Code if it's installed, or `editor` in the settings) |
+| `Alt+`` ` | from anywhere: summon GIBSON, or send it away (`quake` in the settings) |
+
+A command that runs longer than 10 seconds while you're in another tab or another app pops a
+notification when it finishes, and its tab gets a dot.
+
+**Hacker commands** (typed at your prompt; the shell never sees them)
+
+| Command | Does |
+|---|---|
+| `dial 555-0199` | the modem sings and a BBS answers in a new tab: message bases, 0-day file areas, who's online, chat with the sysop, and a door game, LEGEND OF THE NEON DRAGON. Odd numbers get a different board |
+| `wardial 555` | a war dialer ringing through a block of numbers; when one answers with a carrier, NYX tells you which to `dial` |
+| `nfo readme.nfo` | shows a release's .nfo in proper CP437 block art, scrolling, with a chiptune. Esc closes |
+| `scan gibson.ellingson.net` | port-scan theatre. Nothing is actually scanned |
+| `cookie` | the cookie monster. Feed it. (It may also turn up on its own after a long break; `eggs: false` stops that) |
+| `hack the planet` | where you'd expect |
+
+`rm -rf`, `Remove-Item -Recurse`, `format` and friends get the Da Vinci red alert. It's
+see-through and never stops you typing. `hackerCommands: false` hands all of these back to your
+shell.
 
 **The look**
 
 | Key | Does |
 |---|---|
 | `Ctrl+Shift+O` | this pane's opacity, 100% down to 0% (the world shows through) |
-| `Ctrl+Shift+F` | framed (centred, glowing border) or full window |
+| `Ctrl+Shift+U` | framed (centred, glowing border) or full window |
 | `Ctrl+Shift+L` | hide or show the GIBSON logo bar |
 | `Ctrl+Shift+S` | hide or show the scroller along the bottom |
 | `Ctrl+Shift+D` | hide or show the data packets streaming in from the sides |
 | `Ctrl+Shift+W` | next world (the right-click menu picks any) |
 | `Ctrl+Shift+R` | Matrix rain, now |
-| `Ctrl+Shift+N` | NYX on/off |
+| `Ctrl+Shift+N` | NYX on/off (right-click > NYX speaks 1337, for the elite) |
+| `Ctrl+Shift+I` | the IRC lobby beside your terminal |
 | `F11` | fullscreen |
 
 **Music**
@@ -178,8 +218,9 @@ Everything below is also on the **right-click menu**.
 
 The **synth** follows your activity averaged over about 12 seconds (typing, and output scrolling
 past), so a burst barely moves it and a long session drives it up. The **jukebox** plays a folder
-of your own music (mp3, ogg, opus, flac, wav, m4a; subfolders too) at its normal speed, shuffled
-or in order, with a clickable player in the bottom-right corner. GIBSON listens for the bass in
+of your own music (mp3, ogg, opus, flac, wav, m4a, and tracker modules: .mod .xm .s3m .it and
+friends; subfolders too) at its normal speed, shuffled or in order, in a little Winamp-style
+player in the bottom-right corner with a spectrum analyser. GIBSON listens for the bass in
 whatever is playing, so the frame and the worlds still pump on the beat, and NYX has opinions
 about your taste.
 
@@ -191,9 +232,10 @@ about your taste.
 | FILESYSTEM | you `cd` (towers are the folder's real entries) |
 | GIT GALAXY | any `git` command (your repo's last 150 commits; new ones ignite) |
 | ICE WALL | an error (it cracks open when the next command works) |
-| GIBSON CORE | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
-| RAVE WAREHOUSE, HACK THE PLANET | a typing streak (or type `hack the planet`) |
+| GIBSON CORE, THE GARBAGE FILE | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
+| RAVE WAREHOUSE, HACK THE PLANET, GIBSON TOWERS | a typing streak (or type `hack the planet`) |
 | 3D PIPES | a long build (the screensaver while you wait) |
+| KEYGEN | the build finishes |
 | 3D MAZE | you go idle (the screensaver kicks in) |
 | NETWATCH, TRAFFIC MAP | a kind of connection you haven't made this session |
 | PROCESS HIVE | a program hogging the CPU |
@@ -229,6 +271,16 @@ remembered for you; everything else you edit by hand
   "world": "",
   "nyxWorlds": true,
   "cigarette": true,
+  "fontSize": 15,
+  "splitHere": true,
+  "pasteGuard": true,
+  "notifyAfterSec": 10,
+  "editor": "",
+  "quake": { "key": "Alt+`", "dock": false },
+  "hackerCommands": true,
+  "eggs": true,
+  "irc": { "mode": "fake", "server": "irc.libera.chat", "port": 6697, "tls": true, "nick": "", "channels": ["#gibson"], "password": "" },
+  "ircOpen": false,
   "boot": true,
   "framed": true,
   "logo": true,
@@ -254,6 +306,18 @@ remembered for you; everything else you edit by hand
   `startupTabs` by hand. "Forget the start tabs" goes back to one default tab.
 - `world`: the world to start in (blank: NYX decides). `nyxWorlds: false` keeps you there.
 - `cigarette`: the one that burns while you compile (also on the right-click menu).
+- `splitHere`: new panes and tabs open in the focused pane's folder. `false`: your home folder.
+- `editor`: what opens a clicked `file:line`, with `{file}`, `{line}`, `{col}`, e.g.
+  `"subl {file}:{line}"` or `"notepad++ -n{line} {file}"`. Blank: VS Code (`code -g`) when it's on
+  your PATH, else the system's handler. Programs and scripts are never run from a click; without
+  an editor they're shown in their folder.
+- `notifyAfterSec`: how long a command must run before its finish is worth a notification (0: never).
+- `quake.key`: the global summon key, in Electron's accelerator format (`"Alt+`"`,
+  `"Control+Alt+G"`...). `""` turns it off. `quake.dock: true` drops GIBSON down from the top of
+  the screen like a console.
+- `irc.mode`: `fake` (a simulated #hackers: the movie's cast, NYX as op, reacting to what you do),
+  `real` (connects to `server` as `nick` and joins `channels`; nothing else about you is sent), or
+  `off`. The panel only dials when you open it. Slash commands work: `/me /nick /join /part /msg /topic`.
 - `music.source`: `synth` or `folder` (the jukebox, playing `music.folder`).
 - `news.feeds`: any RSS or Atom URLs, fetched every `news.minutes`. `[]` turns the newswire off
   (nothing is fetched).

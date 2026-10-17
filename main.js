@@ -9,6 +9,7 @@ const pty = require('node-pty');
 const { execFile, execFileSync } = require('child_process');
 const { llmLine } = require('./llm');
 const sys = require('./sysinfo');
+const { createIrc, defaultNick } = require('./irc');
 
 // One config folder for source runs and packaged builds (whose app name is GIBSON).
 app.setPath('userData', path.join(app.getPath('appData'), 'gibson'));
@@ -24,6 +25,8 @@ const PANES = Number(arg('--panes') || 1); // start with 1-4 panes
 const UNFRAMED = argv.includes('--unframed');
 const TABS = Number(arg('--tabs') || 1); // start with this many tabs (screenshots)
 const CHAT = arg('--chat');
+const IRC = argv.includes('--irc');       // shots: open the IRC lobby
+const CMD = arg('--cmd');                 // shots: type this GIBSON command (e.g. "dial 555-0199")
 const MUSIC = arg('--music');              // play this folder (the jukebox) instead of the synth                // shots: say this to NYX
 
 const DEFAULTS = {
@@ -50,6 +53,14 @@ const DEFAULTS = {
     feeds: ['https://hnrss.org/frontpage', 'https://www.theregister.com/security/headlines.atom'],
     minutes: 15,
   },
+  irc: {                      // the lobby beside the terminal: fake (a simulated #hackers) | real | off
+    mode: 'fake', server: 'irc.libera.chat', port: 6697, tls: true,
+    nick: '',                 // real mode: blank = a made-up gibsonNNN, saved here on first connect
+    channels: ['#gibson'], password: '',
+  },
+  ircOpen: false,             // the lobby open on start (ctrl+shift+I)
+  hackerCommands: true,       // dial, wardial, nfo, scan, cookie are GIBSON's (false: they go to the shell)
+  eggs: true,                 // now and then a surprise (the cookie monster). false: never
   opacity: 0.86,              // terminal background: 1 solid, 0 see the world straight through
   boot: true,                 // the modem dial-in on startup
   music: { on: true, mode: 'reactive', bpm: 128, volume: 0.55, source: 'synth', folder: '', shuffle: true }, // source: synth | folder
@@ -70,12 +81,12 @@ function loadConfig() {
   try { user = JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(DEFAULTS, null, 2)); }
   const cfg = { ...DEFAULTS, ...user };
-  for (const k of ['music', 'nyx', 'llm', 'news']) cfg[k] = { ...DEFAULTS[k], ...(user[k] || {}) };
+  for (const k of ['music', 'nyx', 'llm', 'news', 'irc', 'quake']) cfg[k] = { ...DEFAULTS[k], ...(user[k] || {}) };
   cfg.file = file;
   return cfg;
 }
 
-let win, cfg, home = os.homedir();
+let win, cfg, home = os.homedir(), irc = null; // irc: the real-mode client, once the lobby dials
 // Remember one setting in config.json (and for this session). Shots never touch the user's config.
 function writeCfg(key, v) {
   cfg[key] = key === 'music' ? { ...cfg.music, ...v } : v;
@@ -107,7 +118,7 @@ const DEMO_NEWS = () => ['Gibson mainframe breached by unknown worm', 'Da Vinci 
   .map((title) => ({ title, link: '', source: 'GIBSON WIRE' }));
 
 // The jukebox's tracks: audio files under the chosen folder, three levels deep at most.
-const AUDIO = /\.(mp3|ogg|oga|opus|wav|flac|m4a|aac|webm)$/i;
+const AUDIO = /\.(mp3|ogg|oga|opus|wav|flac|m4a|aac|webm|mod|xm|s3m|it|mptm|stm|669|med|mtm|okt|far|ult|dbm|dmf|psm|ptm|amf|mo3|umx)$/i; // tracker modules play through libopenmpt
 function listMusic(dir) {
   const out = [];
   const walk = (d, rel, depth) => {
@@ -162,8 +173,26 @@ function defaultProfile() {
 }
 const isDir = (d) => { try { return !!d && fs.statSync(d).isDirectory(); } catch { return false; } };
 
+// A program on plain pipes, shaped like a node-pty terminal. For the BBS: on Windows electron.exe is
+// a GUI program, so under ConPTY its output goes nowhere; over pipes it works on every system.
+function piped(prof, cwd) {
+  const child = require('child_process').spawn(prof.shell, prof.args, { cwd, env: { ...process.env, ...prof.env }, stdio: 'pipe', windowsHide: true });
+  child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
+  return {
+    write: (d) => { try { child.stdin.write(d); } catch { /* gone */ } },
+    resize() {}, kill: () => child.kill(),
+    onData: (fn) => { child.stdout.on('data', fn); child.stderr.on('data', fn); },
+    onExit: (fn) => child.on('exit', fn),
+  };
+}
+const BBS = path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), 'bbs', 'bbs.js');
 function spawnShell(id, opts) {
   let pane = panes.get(id);
+  if (!pane && opts && opts.bbs) { // `dial <number>`: the BBS, once; hanging up ends it
+    const number = String(opts.bbs).replace(/[^\d\-+*#() ]/g, '').slice(0, 20) || '555-0199';
+    pane = { cwd: home, prof: { name: 'BBS', shell: process.execPath, args: [BBS, number], env: { ELECTRON_RUN_AS_NODE: '1', BBS_TTY: '1', BBS_COLS: '80' }, once: true, pipes: true } };
+    panes.set(id, pane);
+  }
   if (!pane) {
     const prof = (!SHOT && findProfile(opts && opts.profile)) || defaultProfile();
     const from = opts && opts.from && cfg.splitHere !== false && panes.get(opts.from); // split from here
@@ -174,9 +203,9 @@ function spawnShell(id, opts) {
   const send = (d) => win && !win.isDestroyed() && win.webContents.send('pty:data', id, d);
   let term;
   try {
-    term = pane.term = pty.spawn(pane.prof.shell, pane.prof.args || [], {
+    if (pane.prof.pipes) term = pane.term = piped(pane.prof, pane.cwd); else term = pane.term = pty.spawn(pane.prof.shell, pane.prof.args || [], {
       name: 'xterm-256color', cols: 100, rows: 30, cwd: pane.cwd,
-      env: { ...process.env, TERM_PROGRAM: 'GIBSON', ...(SHOT ? { PS1: 'hacker@gibson:~$ ' } : {}) },
+      env: { ...process.env, TERM_PROGRAM: 'GIBSON', ...(SHOT ? { PS1: 'hacker@gibson:~$ ' } : {}), ...(pane.prof.env || {}) },
     });
   } catch (e) { // a profile pointing at a shell that is not there
     send(`\x1b[31m-- cannot start ${pane.prof.shell}: ${e.message} --\x1b[0m\r\n`);
@@ -187,6 +216,7 @@ function spawnShell(id, opts) {
   term.onData(send);
   term.onExit(() => {
     if (pane.closed || pane.term !== term) return; // closed on purpose
+    if (pane.prof.once) return send('\r\n\x1b[35m-- line dropped. Close this tab (ctrl+shift+X) or dial again. --\x1b[0m\r\n'); // the BBS says its own NO CARRIER
     send('\r\n\x1b[35m-- NO CARRIER --\x1b[0m\r\n');
     if (Date.now() - born < 2000) return send('\x1b[35m-- the shell quit right away, so no redial. Close this tab or pick another shell. --\x1b[0m\r\n');
     spawnShell(id);
@@ -245,7 +275,7 @@ function listDir(dir) {
 
 // Ctrl+Shift + these keys, by key code (the shifted characters differ by keyboard layout)
 const CODEKEYS = { BracketRight: 'music:next', BracketLeft: 'music:prev', Equal: 'music:volup', Minus: 'music:voldown' };
-const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'find', U: 'frame', S: 'scroller', L: 'logo', D: 'packets', P: 'music:toggle', J: 'music:source', A: 'broadcast', Z: 'zoompane' };
+const HOTKEYS = { I: 'irc', C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'find', U: 'frame', S: 'scroller', L: 'logo', D: 'packets', P: 'music:toggle', J: 'music:source', A: 'broadcast', Z: 'zoompane' };
 // Ctrl + these (no Shift): font size, as in every terminal and browser
 const ZOOMKEYS = { Equal: 'font:up', NumpadAdd: 'font:up', Minus: 'font:down', NumpadSubtract: 'font:down', Digit0: 'font:reset', Numpad0: 'font:reset' };
 const TAB_COLOURS = [['None', ''], ['Pink', '#ff2e88'], ['Green', '#39ff9c'], ['Ice', '#36d6ff'], ['Gold', '#ffc448'], ['Violet', '#a860ff'], ['Red', '#ff3864']];
@@ -312,6 +342,7 @@ function contextMenu(st) {
     item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
     { label: 'Cigarette while compiling', type: 'checkbox', checked: cfg.cigarette !== false, click: act('cigarette') },
     item('NYX', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
+    item('IRC lobby', 'irc', 'I', { type: 'checkbox', checked: st.irc }),
     { label: 'NYX speaks 1337', type: 'checkbox', checked: st.leet, click: act('leet') },
     item('Matrix rain', 'rain', 'R'),
     { type: 'separator' },
@@ -367,34 +398,48 @@ function createWindow() {
 }
 
 // Registered before ready: streaming lets <audio> seek in big files.
-protocol.registerSchemesAsPrivileged([{ scheme: 'gibson-music', privileges: { standard: true, secure: true, stream: true, corsEnabled: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: 'gibson-music', privileges: { standard: true, secure: true, stream: true, corsEnabled: true, supportFetchAPI: true } }]); // fetch: tracker modules are read whole
 
 app.whenReady().then(() => {
   cfg = loadConfig();
   if (MUSIC) cfg.music = { ...cfg.music, source: 'folder', folder: path.resolve(MUSIC) };
   profiles = detectShells();
   for (const p of cfg.profiles || []) if (p && p.name && p.shell) { const i = profiles.findIndex((x) => x.name === p.name); if (i >= 0) profiles[i] = p; else profiles.push(p); }
-  if (SHOT) { cfg = { ...demoShell(cfg), startupTabs: [], world: '', nyxWorlds: true, cigarette: true, framed: true, opacity: 0.86, scroller: true, logo: true, music: MUSIC ? cfg.music : { ...cfg.music, source: 'synth' } }; home = demoHome(); } // shots ignore saved view choices
+  if (SHOT) { cfg = { ...demoShell(cfg), irc: { ...cfg.irc, mode: 'fake' }, ircOpen: false, eggs: false, startupTabs: [], world: '', nyxWorlds: true, cigarette: true, framed: true, opacity: 0.86, scroller: true, logo: true, music: MUSIC ? cfg.music : { ...cfg.music, source: 'synth' } }; home = demoHome(); } // shots ignore saved view choices
   ipcMain.handle('boot', () => ({
-    cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined } },
+    cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined }, irc: { ...cfg.irc, password: undefined } },
     user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, tabs: TABS, chat: CHAT, unframed: UNFRAMED,
     startTabs: cfg.startupTabs, defaults: { fontSize: DEFAULTS.fontSize }, defaultShell: SHOT ? '' : defaultProfile().name,
-    shot: !!SHOT, world: WORLD, mute: MUTE, bootShot: argv.includes('--boot'),
+    shot: !!SHOT, world: WORLD, irc: IRC, cmd: CMD, mute: MUTE, bootShot: argv.includes('--boot'),
   }));
   ipcMain.on('pty:open', (_e, id, opts) => { if (!panes.has(id)) spawnShell(id, opts); });
   ipcMain.on('pty:close', (_e, id) => killShell(id));
   ipcMain.on('pty:write', (_e, id, d) => { const p = panes.get(id); if (p && p.term) p.term.write(d); });
   ipcMain.on('pty:resize', (_e, id, c, r) => { try { panes.get(id).term.resize(c, r); } catch { /* shell restarting */ } });
   ipcMain.on('pty:line', (_e, id, line) => { const p = panes.get(id); if (p) trackCd(p, line); });
+  // `nfo <file>`: the raw bytes (the page decodes CP437). Under 1 MB, relative to the pane's folder.
+  ipcMain.handle('fs:read', (_e, id, file) => {
+    try { const f = linkPath(id, String(file)); return fs.statSync(f).size < 1048576 ? fs.readFileSync(f) : null; } catch { return null; }
+  });
+  // The IRC lobby's real mode dials only when config.json says so, and only once the panel opens.
+  ipcMain.handle('irc:connect', () => {
+    if (SHOT || cfg.irc.mode !== 'real') return null;
+    if (!irc) {
+      if (!cfg.irc.nick) writeCfg('irc', { ...cfg.irc, nick: defaultNick() }); // made up, kept for next time
+      irc = createIrc(cfg.irc, (ev) => win && !win.isDestroyed() && win.webContents.send('irc:event', ev));
+    }
+    return { nick: irc.nick(), server: irc.server };
+  });
+  ipcMain.on('irc:command', (_e, line, target) => { if (irc) irc.command(String(line), String(target || '')); });
   ipcMain.handle('fs:list', (_e, id) => { const d = (panes.get(id) || { cwd: home }).cwd; return { cwd: SHOT ? 'C:\\GIBSON' : d, entries: listDir(d) }; });
   ipcMain.on('cfg:save', (_e, key, v) => { // view choices remembered across restarts
-    if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'cigarette', 'fontSize', 'pasteGuard'].includes(key)) writeCfg(key, v);
+    if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'cigarette', 'fontSize', 'pasteGuard', 'ircOpen'].includes(key)) writeCfg(key, v);
     if (key === 'nyxLeet') writeCfg('nyx', { ...cfg.nyx, leet: !!v });
   });
   // The tabs as they are now become the start tabs. The page sends each tab's first pane id
   // and pane count; the shell and folder are known here.
   ipcMain.on('tabs:save', (_e, list) => {
-    const tabs = list.map((t) => { const p = panes.get(t.id); return p && { profile: p.prof.name, cwd: p.cwd, panes: t.panes, ...(t.name ? { name: String(t.name).slice(0, 40) } : {}), ...(t.color ? { color: String(t.color).slice(0, 9) } : {}) }; }).filter(Boolean);
+    const tabs = list.map((t) => { const p = panes.get(t.id); return p && !p.prof.once && { profile: p.prof.name, cwd: p.cwd, panes: t.panes, ...(t.name ? { name: String(t.name).slice(0, 40) } : {}), ...(t.color ? { color: String(t.color).slice(0, 9) } : {}) }; }).filter(Boolean);
     writeCfg('startupTabs', tabs);
   });
   // file:line links in the terminal. Paths are relative to the pane's folder; only real files count.
@@ -454,4 +499,5 @@ app.whenReady().then(() => {
   createWindow();
 });
 
+app.on('before-quit', () => { if (irc) irc.quit('NO CARRIER'); });
 app.on('window-all-closed', () => { for (const id of [...panes.keys()]) killShell(id); setTimeout(() => app.quit(), 500); }); // see the shot exit

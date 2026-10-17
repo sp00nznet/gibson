@@ -6,7 +6,8 @@ const door = require('./door');
 
 const NUMBER = process.argv[2] || '555-0199';
 const TTY = !!process.stdin.isTTY;
-const FAST = !process.stdout.isTTY || !!process.env.BBS_FAST; // pipes and tests skip the delays
+// Pipes and tests skip the delays. GIBSON runs the board over pipes too (BBS_TTY=1): the delays stay.
+const FAST = (!process.stdout.isTTY && !process.env.BBS_TTY) || !!process.env.BBS_FAST;
 const T0 = Date.now(), MINUTES = 60;
 
 // Seeded RNG so check.js is repeatable (BBS_SEED).
@@ -21,7 +22,7 @@ const roll = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1));
 const pick = a => a[Math.floor(rnd() * a.length)];
 const c = (n, s) => `\x1b[38;5;${n}m${s}\x1b[0m`;
 const vis = s => s.replace(/\x1b\[[0-9;]*m/g, '');
-const cols = () => process.stdout.columns || 80;
+const cols = () => process.stdout.columns || Number(process.env.BBS_COLS) || 80;
 const centre = s => ' '.repeat(Math.max(0, (cols() - [...vis(s)].length) >> 1)) + s;
 const sleep = ms => FAST ? Promise.resolve() : new Promise(r => setTimeout(r, ms));
 
