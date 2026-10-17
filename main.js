@@ -1,6 +1,6 @@
 // GIBSON main process: owns the shell (node-pty), the config file, and every
 // LLM call, so API keys never reach the renderer. Design: docs/architecture.md.
-const { app, BrowserWindow, ipcMain, shell, Menu, dialog, protocol, net } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, dialog, protocol, net, globalShortcut, screen } = require('electron');
 const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
@@ -12,6 +12,7 @@ const sys = require('./sysinfo');
 
 // One config folder for source runs and packaged builds (whose app name is GIBSON).
 app.setPath('userData', path.join(app.getPath('appData'), 'gibson'));
+if (process.platform === 'win32') app.setAppUserModelId('net.sp00nz.gibson'); // toast notifications need it
 
 const argv = process.argv.slice(1);
 const arg = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
@@ -34,6 +35,11 @@ const DEFAULTS = {
   world: '',                  // the world to start in; blank = NYX decides
   nyxWorlds: true,            // false: NYX never changes the world, only you do
   cigarette: true,            // the cigarette that burns while you compile
+  splitHere: true,            // new panes and tabs open in the focused pane's folder (false: home)
+  pasteGuard: true,           // ask before pasting more than one line into a shell
+  notifyAfterSec: 10,         // a command that ran this long tells you when it finishes (0: never)
+  editor: '',                 // opens clicked file:line links, e.g. "code -g {file}:{line}:{col}". Blank: VS Code if found, else the system
+  quake: { key: 'Alt+`', dock: false }, // a global key that summons/hides GIBSON; dock: drop down from the top. key '' turns it off
   fontFamily: "'Cascadia Mono', Consolas, 'Courier New', monospace",
   fontSize: 15,
   framed: true,               // false: the terminal fills the window, the scene shows through
@@ -160,7 +166,8 @@ function spawnShell(id, opts) {
   let pane = panes.get(id);
   if (!pane) {
     const prof = (!SHOT && findProfile(opts && opts.profile)) || defaultProfile();
-    const cwd = [opts && opts.cwd, prof.cwd].find(isDir) || home;
+    const from = opts && opts.from && cfg.splitHere !== false && panes.get(opts.from); // split from here
+    const cwd = [opts && opts.cwd, from && from.cwd, prof.cwd].find(isDir) || home;
     pane = { cwd, prof: SHOT ? { shell: cfg.shell, args: cfg.shellArgs } : prof };
     panes.set(id, pane);
   }
@@ -213,6 +220,19 @@ function gitLog(dir) {
   });
 }
 
+// Open a clicked file:line. cfg.editor is a command with {file} {line} {col}; blank means VS Code
+// when it is installed, else the system's own handler. Programs and scripts are never run from a
+// click: without an editor they are shown in their folder instead.
+const RUNNABLE = /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|wsf|msi|msc|lnk|scr|reg|sh|command|app|jar|py)$/i;
+function openInEditor(file, line, col) {
+  const tmpl = cfg.editor || (onPath(process.platform === 'win32' ? 'code.cmd' : 'code') ? 'code -g {file}:{line}:{col}' : '');
+  if (!tmpl) return RUNNABLE.test(file) ? shell.showItemInFolder(file) : shell.openPath(file);
+  const win32 = process.platform === 'win32';
+  const args = tmpl.split(/\s+/).filter(Boolean).map((a) => a.replace('{file}', file).replace('{line}', line).replace('{col}', col));
+  const quote = (a) => (win32 && /[\s&()^]/.test(a) ? `"${a}"` : a); // cmd.exe runs .cmd shims like code.cmd
+  try { require('child_process').spawn(quote(args[0]), args.slice(1).map(quote), { shell: win32, detached: true, stdio: 'ignore', windowsHide: true }).unref(); } catch { shell.openPath(file); }
+}
+
 function listDir(dir) {
   try {
     return fs.readdirSync(dir, { withFileTypes: true }).slice(0, 160).map((e) => {
@@ -225,7 +245,10 @@ function listDir(dir) {
 
 // Ctrl+Shift + these keys, by key code (the shifted characters differ by keyboard layout)
 const CODEKEYS = { BracketRight: 'music:next', BracketLeft: 'music:prev', Equal: 'music:volup', Minus: 'music:voldown' };
-const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'frame', S: 'scroller', L: 'logo', D: 'packets', P: 'music:toggle', J: 'music:source' };
+const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'find', U: 'frame', S: 'scroller', L: 'logo', D: 'packets', P: 'music:toggle', J: 'music:source', A: 'broadcast', Z: 'zoompane' };
+// Ctrl + these (no Shift): font size, as in every terminal and browser
+const ZOOMKEYS = { Equal: 'font:up', NumpadAdd: 'font:up', Minus: 'font:down', NumpadSubtract: 'font:down', Digit0: 'font:reset', Numpad0: 'font:reset' };
+const TAB_COLOURS = [['None', ''], ['Pink', '#ff2e88'], ['Green', '#39ff9c'], ['Ice', '#36d6ff'], ['Gold', '#ffc448'], ['Violet', '#a860ff'], ['Red', '#ff3864']];
 
 // New tab with a given shell: one item per profile.
 const shellItems = (act) => profiles.map((p) => ({ label: p.name + (p.name === defaultProfile().name ? '  (default)' : ''), click: act('newtab:' + p.name) }));
@@ -236,18 +259,31 @@ function contextMenu(st) {
   const item = (label, a, key, extra) => ({ label, click: act(a), accelerator: key && 'Ctrl+Shift+' + key, registerAccelerator: false, ...extra });
   return Menu.buildFromTemplate([
     item('Copy', 'copy', 'C', { enabled: st.selection }), item('Paste', 'paste', 'V'),
+    item('Find...', 'find', 'F'),
     { type: 'separator' },
     item('New tab', 'newtab', 'T'),
     { label: 'New tab with', submenu: shellItems(act) },
     item('Close tab', 'closetab', 'X'),
     { label: 'Rename tab...', click: act('renametab') },
+    { label: 'Tab colour', submenu: TAB_COLOURS.map(([label, c]) => ({ label, type: 'radio', checked: c === (st.tabColor || ''), click: act('tabcolor:' + c) })) },
     { label: 'Tabs', submenu: [
       { label: 'Open these tabs on start', click: act('tabs:save') },
       { label: `Forget the start tabs${cfg.startupTabs.length ? ` (${cfg.startupTabs.length})` : ''}`, enabled: cfg.startupTabs.length > 0, click: () => writeCfg('startupTabs', []) },
       { type: 'separator' },
       { label: 'Default shell', submenu: profiles.map((p) => ({ label: p.name, type: 'radio', checked: p.name === defaultProfile().name, click: () => writeCfg('defaultShell', p.name) })) },
     ] },
-    { label: 'Panes', submenu: [1, 2, 3, 4].map((n) => ({ label: `${n}`, type: 'radio', checked: n === st.panes, accelerator: `Ctrl+Shift+${n}`, registerAccelerator: false, click: act('panes:' + n) })) },
+    { label: 'Panes', submenu: [
+      ...[1, 2, 3, 4].map((n) => ({ label: `${n}`, type: 'radio', checked: n === st.panes, accelerator: `Ctrl+Shift+${n}`, registerAccelerator: false, click: act('panes:' + n) })),
+      { type: 'separator' },
+      item('Zoom this pane', 'zoompane', 'Z', { type: 'checkbox', checked: st.zoomed, enabled: st.panes > 1 }),
+      item('Type into every pane', 'broadcast', 'A', { type: 'checkbox', checked: st.broadcast, enabled: st.panes > 1 }),
+      { label: 'Even out the panes', click: act('evenpanes'), enabled: st.panes > 1 },
+    ] },
+    { label: 'Text size', submenu: [
+      { label: 'Bigger', accelerator: 'Ctrl+=', registerAccelerator: false, click: act('font:up') },
+      { label: 'Smaller', accelerator: 'Ctrl+-', registerAccelerator: false, click: act('font:down') },
+      { label: `Reset (${DEFAULTS.fontSize})`, accelerator: 'Ctrl+0', registerAccelerator: false, click: act('font:reset') },
+    ] },
     { label: 'World', submenu: [
       ...st.worlds.map(([key, label]) => ({ label: key === cfg.world ? label + '  (start)' : label, type: 'radio', checked: key === st.world, click: act('world:' + key) })),
       { type: 'separator' },
@@ -270,7 +306,7 @@ function contextMenu(st) {
       { label: 'Volume down', accelerator: 'Ctrl+Shift+-', registerAccelerator: false, click: act('music:voldown') },
     ] },
     item('Tempo follows activity', 'tempo', 'B', { type: 'checkbox', checked: st.reactive }),
-    item('Framed', 'frame', 'F', { type: 'checkbox', checked: st.framed }),
+    item('Framed', 'frame', 'U', { type: 'checkbox', checked: st.framed }),
     item('Scroller', 'scroller', 'S', { type: 'checkbox', checked: st.scroller }),
     item('Logo', 'logo', 'L', { type: 'checkbox', checked: st.logo }),
     item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
@@ -281,6 +317,7 @@ function contextMenu(st) {
     { label: 'Pane opacity', submenu: [1, 0.86, 0.7, 0.5, 0.3, 0.15, 0].map((o) => ({ label: `${Math.round(o * 100)}%`, type: 'radio', checked: Math.abs(o - st.opacity) < 0.01, click: act('opacity:' + o) })) },
     item('Cycle opacity', 'opacity', 'O'),
     { type: 'separator' },
+    { label: 'Ask before pasting several lines', type: 'checkbox', checked: cfg.pasteGuard !== false, click: act('pasteguard') },
     { label: 'Fullscreen', accelerator: 'F11', registerAccelerator: false, click: act('fullscreen') },
     { label: 'Open config.json', click: () => shell.openPath(cfg.file) },
   ]);
@@ -307,6 +344,7 @@ function createWindow() {
     const digit = /^Digit([1-4])$/.exec(i.code); // Ctrl+Shift+1..4: i.key is '!' etc, so read the code
     if (digit && i.control && i.shift) { e.preventDefault(); return win.webContents.send('hotkey', 'panes:' + digit[1]); }
     if (i.control && i.shift && CODEKEYS[i.code]) { e.preventDefault(); return win.webContents.send('hotkey', CODEKEYS[i.code]); }
+    if (i.control && !i.shift && !i.alt && ZOOMKEYS[i.code]) { e.preventDefault(); return win.webContents.send('hotkey', ZOOMKEYS[i.code]); }
     const tabKey = i.control && ((i.key === 'Tab' && (i.shift ? 'prevtab' : 'nexttab')) || (i.key === 'PageDown' && 'nexttab') || (i.key === 'PageUp' && 'prevtab'));
     if (tabKey) { e.preventDefault(); return win.webContents.send('hotkey', tabKey); }
     if (k === 'F11' || (i.control && i.shift && HOTKEYS[k])) { e.preventDefault(); win.webContents.send('hotkey', k === 'F11' ? 'fullscreen' : HOTKEYS[k]); }
@@ -339,7 +377,7 @@ app.whenReady().then(() => {
   ipcMain.handle('boot', () => ({
     cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined } },
     user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, tabs: TABS, chat: CHAT, unframed: UNFRAMED,
-    startTabs: cfg.startupTabs, defaultShell: SHOT ? '' : defaultProfile().name,
+    startTabs: cfg.startupTabs, defaults: { fontSize: DEFAULTS.fontSize }, defaultShell: SHOT ? '' : defaultProfile().name,
     shot: !!SHOT, world: WORLD, mute: MUTE, bootShot: argv.includes('--boot'),
   }));
   ipcMain.on('pty:open', (_e, id, opts) => { if (!panes.has(id)) spawnShell(id, opts); });
@@ -349,14 +387,18 @@ app.whenReady().then(() => {
   ipcMain.on('pty:line', (_e, id, line) => { const p = panes.get(id); if (p) trackCd(p, line); });
   ipcMain.handle('fs:list', (_e, id) => { const d = (panes.get(id) || { cwd: home }).cwd; return { cwd: SHOT ? 'C:\\GIBSON' : d, entries: listDir(d) }; });
   ipcMain.on('cfg:save', (_e, key, v) => { // view choices remembered across restarts
-    if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'cigarette'].includes(key)) writeCfg(key, v);
+    if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'cigarette', 'fontSize', 'pasteGuard'].includes(key)) writeCfg(key, v);
   });
   // The tabs as they are now become the start tabs. The page sends each tab's first pane id
   // and pane count; the shell and folder are known here.
   ipcMain.on('tabs:save', (_e, list) => {
-    const tabs = list.map((t) => { const p = panes.get(t.id); return p && { profile: p.prof.name, cwd: p.cwd, panes: t.panes, ...(t.name ? { name: String(t.name).slice(0, 40) } : {}) }; }).filter(Boolean);
+    const tabs = list.map((t) => { const p = panes.get(t.id); return p && { profile: p.prof.name, cwd: p.cwd, panes: t.panes, ...(t.name ? { name: String(t.name).slice(0, 40) } : {}), ...(t.color ? { color: String(t.color).slice(0, 9) } : {}) }; }).filter(Boolean);
     writeCfg('startupTabs', tabs);
   });
+  // file:line links in the terminal. Paths are relative to the pane's folder; only real files count.
+  const linkPath = (id, file) => path.resolve((panes.get(id) || { cwd: home }).cwd, file.replace(/^~(?=[\\/])/, os.homedir()));
+  ipcMain.handle('link:check', (_e, id, files) => files.map((f) => !SHOT && exists(linkPath(id, f))));
+  ipcMain.on('link:open', (_e, id, file, line, col) => openInEditor(linkPath(id, file), line || 1, col || 1));
   ipcMain.on('menu:shells', () => Menu.buildFromTemplate(shellItems((a) => () => win.webContents.send('hotkey', a))).popup({ window: win }));
   ipcMain.handle('git:log', (_e, id) => gitLog((panes.get(id) || { cwd: home }).cwd));
   ipcMain.handle('sys:net', () => (SHOT ? DEMO_NET() : sys.netConns()));
@@ -380,6 +422,7 @@ app.whenReady().then(() => {
   });
   ipcMain.on('menu', (_e, st) => contextMenu(st).popup({ window: win }));
   ipcMain.handle('nyx:llm', (_e, event) => llmLine(cfg.llm, event).catch(() => null));
+  ipcMain.on('win:focus', () => { if (win.isMinimized()) win.restore(); win.show(); win.focus(); });
   ipcMain.on('win:fullscreen', () => win.setFullScreen(!win.isFullScreen()));
   // NEWSWIRE: fetch the feeds now and every news.minutes, push headlines to the page.
   const pushNews = async () => {
@@ -390,6 +433,21 @@ app.whenReady().then(() => {
     setTimeout(pushNews, SHOT ? 1500 : 8000);
     if (!SHOT) setInterval(pushNews, Math.max(5, cfg.news.minutes || 15) * 60000);
   }
+  // Quake mode: a global key summons GIBSON from anywhere and sends it away again.
+  if (!SHOT && cfg.quake && cfg.quake.key) {
+    try {
+      globalShortcut.register(cfg.quake.key, () => {
+        if (!win || win.isDestroyed()) return;
+        if (win.isVisible() && win.isFocused() && !win.isMinimized()) { if (cfg.quake.dock) win.hide(); else win.minimize(); return; }
+        if (cfg.quake.dock) { // drop down from the top of the screen the mouse is on
+          const wa = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+          win.setBounds({ x: wa.x, y: wa.y, width: wa.width, height: Math.round(wa.height * 0.55) });
+        }
+        win.show(); win.restore(); win.focus();
+      });
+    } catch { /* key taken or invalid: no quake mode */ }
+  }
+  app.on('will-quit', () => globalShortcut.unregisterAll());
   Menu.setApplicationMenu(null); // the default menu's accelerators (Ctrl+Shift+R = reload) fight ours
   createWindow();
 });

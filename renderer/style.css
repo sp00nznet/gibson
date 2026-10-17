@@ -46,6 +46,7 @@ body.unframed #frame { inset: 0; border: none; box-shadow: none; transform: none
 /* tab bar: always there, so + and the shell picker are; the lone tab has no close button */
 #tabs { flex: none; display: flex; gap: 2px; padding: 4px 6px 0; overflow-x: auto; background: rgba(0, 0, 0, 0.55); }
 #tabs .rename { font: inherit; color: #fff; background: #000; border: 1px solid rgba(255, 46, 136, 0.8); padding: 0 4px; width: 14ch; outline: none; }
+#tabs button.coloured { border-top: 2px solid var(--tabc); color: var(--tabc); }
 #tabs .x { margin-left: 8px; color: #4d6b5c; padding: 0 2px; }
 #tabs .x:hover { color: #ff3864; }
 #tabs.solo .x { display: none; }
@@ -66,6 +67,26 @@ body.unframed #frame { inset: 0; border: none; box-shadow: none; transform: none
 .tab.n2 { grid-template: 1fr / 1fr 1fr; }
 .tab.n3, .tab.n4 { grid-template: 1fr 1fr / 1fr 1fr; }
 .tab.n3 .pane:first-child { grid-row: span 2; }
+.tab.n3 .splitter + .splitter + .pane { grid-row: span 2; }
+/* drag handles between panes (app.js splitters); --c and --r are the split fractions */
+.splitter { position: absolute; z-index: 3; display: none; }
+.splitter.vsplit { top: 0; bottom: 0; width: 8px; left: calc(var(--c) * 100% - 4px); cursor: col-resize; }
+.splitter.hsplit { left: 0; right: 0; height: 8px; top: calc(var(--r) * 100% - 4px); cursor: row-resize; }
+.tab.n3.n3 .hsplit { left: calc(var(--c) * 100%); }
+.tab:not(.n1):not(.zoomed) .vsplit, .tab.n3:not(.zoomed) .hsplit, .tab.n4:not(.zoomed) .hsplit { display: block; }
+.splitter:hover { background: rgba(255, 46, 136, 0.35); }
+/* one pane zoomed to fill the tab (Ctrl+Shift+Z) */
+.tab.zoomed .pane:not(.zoom) { display: none; }
+.tab.zoomed .pane.zoom { grid-area: 1 / 1 / -1 / -1; }
+/* typing into every pane (Ctrl+Shift+A) */
+.tab.broadcast .pane { border-color: rgba(255, 196, 72, 0.8) !important; box-shadow: 0 0 10px rgba(255, 196, 72, 0.35); }
+/* find bar (Ctrl+Shift+F) */
+.findbar { position: absolute; top: 6px; right: 18px; z-index: 5; display: flex; gap: 4px; align-items: center; padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.85); border: 1px solid rgba(255, 46, 136, 0.7); box-shadow: 0 0 12px rgba(255, 46, 136, 0.35); }
+.findbar input { font: 13px 'Cascadia Mono', Consolas, monospace; color: #fff; background: #000; border: 1px solid rgba(57, 255, 156, 0.4); padding: 2px 6px; width: 22ch; outline: none; }
+.findbar .count { font: 11px 'Cascadia Mono', Consolas, monospace; color: #8bffc4; min-width: 5ch; text-align: right; }
+.findbar button { font: 11px 'Cascadia Mono', Consolas, monospace; color: #ff7ab8; background: none; border: none; cursor: pointer; padding: 0 3px; }
+.findbar button:hover { color: #fff; }
 /* each pane has its own opacity (--term-alpha, set per pane by app.js) */
 .pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; padding: 8px 10px; background: rgba(2, 6, 4, var(--term-alpha, 0.86)); }
 .tab:not(.n1) .pane { padding: 4px 6px; border: 1px solid rgba(57, 255, 156, 0.18); }
