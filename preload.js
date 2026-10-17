@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('gibson', {
   boot: () => ipcRenderer.invoke('boot'),
-  open: (id) => ipcRenderer.send('pty:open', id),
+  open: (id, opts) => ipcRenderer.send('pty:open', id, opts),
   close: (id) => ipcRenderer.send('pty:close', id),
   write: (id, d) => ipcRenderer.send('pty:write', id, d),
   resize: (id, c, r) => ipcRenderer.send('pty:resize', id, c, r),
@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('gibson', {
   onNews: (fn) => ipcRenderer.on('news', (_e, items) => fn(items)),
   onHotkey: (fn) => ipcRenderer.on('hotkey', (_e, a) => fn(a)),
   menu: (state) => ipcRenderer.send('menu', state),
+  shellMenu: () => ipcRenderer.send('menu:shells'),
+  saveTabs: (list) => ipcRenderer.send('tabs:save', list),
   musicList: () => ipcRenderer.invoke('music:list'),
   musicPick: () => ipcRenderer.invoke('music:pick'),
   save: (key, v) => ipcRenderer.send('cfg:save', key, v),

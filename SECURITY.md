@@ -14,16 +14,20 @@ machine, and where keys live:
   put in `config.json` (see the README for its path on each system) is stored in plain text. Keys stay in
   the main process; the page never receives them (`main.js` strips `apiKey` before handing
   the config over).
-- **NETWATCH and PROCESS HIVE** run `netstat` / `ss` and `ps` / `Get-Process` locally. Addresses
+- **NETWATCH, TRAFFIC MAP and PROCESS HIVE** run `netstat` / `ss` and `ps` / `Get-Process` locally. Addresses
   and program names are drawn on your screen and go nowhere else, except that NYX is told the
   *service* of a new kind of connection ("https", "ssh", never the address) and the name of a
   program hogging the CPU. With a hosted model, those words leave the machine.
+  The TRAFFIC MAP places addresses with a built-in table of address blocks; no geoip service
+  is asked. Its "home" is a guess from your time zone, drawn on screen only.
 - **NEWSWIRE** fetches the RSS/Atom URLs in `news.feeds` every `news.minutes` (default: Hacker
   News and The Register's security feed). Those requests carry nothing about you beyond what
   any feed reader sends. `"feeds": []` stops them. Headlines are passed to NYX.
 - **The jukebox** plays files from the folder you choose, through a `gibson-music:` protocol that
   serves audio files from inside that folder only (no `file://` access for the page). Nothing is
   copied or uploaded. NYX is told the file name of the track that starts.
+- **Shell profiles and start tabs** are read from and written to `config.json` only; the shells
+  are whatever programs you name there, run as you.
 - **Screenshots** (`--shot`) never show the machine they run on: a made-up folder, user,
   connections, programs and headlines.
 - **The page.** Context isolation is on, Node integration is off, and the page's only

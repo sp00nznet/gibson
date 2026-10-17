@@ -4,6 +4,31 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-17
+
+### Added
+- Shell profiles. Installed shells are found on their own (Windows: PowerShell, PowerShell 7,
+  Command Prompt, WSL, Git Bash; macOS/Linux: `/etc/shells`); add your own as `profiles`. The
+  `▾` button next to `+` (and right-click > New tab with) opens a tab in any of them;
+  right-click > Tabs > Default shell picks the default (`defaultShell`).
+- Start tabs: right-click > Tabs > Open these tabs on start saves each tab's shell, folder and
+  pane count (`startupTabs`); they reopen next launch.
+- A close button on each tab.
+- Default world: right-click > World > Start in this world (`world`), and NYX picks the world
+  on/off (`nyxWorlds`).
+- Cigarette on/off (`cigarette`, right-click menu). Now and then its smoke curls into a heart.
+- WORLD NEWS: a wireframe Earth; each headline pops up where it happened (a keyword list of
+  places) with a callout out to the side, and the globe turns to it.
+- TRAFFIC MAP: your connections arcing out from home across the globe, placed by internet
+  registry (offline, continent-level; nothing is looked up).
+- HACK THE PLANET: the Earth, a Jolly Roger floppy in orbit and the words going round. Typing
+  `hack the planet` (or a typing streak) takes you there.
+
+### Changed
+- The tab bar is always shown, so `+` and the shell picker are always there.
+- A shell that quits within two seconds is not redialed in a loop; one that cannot start falls
+  back to the default shell.
+
 ## [0.7.0] - 2026-10-17
 
 ### Added

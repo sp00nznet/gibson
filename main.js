@@ -28,6 +28,12 @@ const MUSIC = arg('--music');              // play this folder (the jukebox) ins
 const DEFAULTS = {
   shell: process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash'),
   shellArgs: process.platform === 'win32' ? ['-NoLogo'] : [],
+  defaultShell: '',           // a profile name ('PowerShell', 'WSL', ...); blank = shell above
+  profiles: [],               // extra shells: { name, shell, args, cwd }. Installed ones are found on their own
+  startupTabs: [],            // { profile, cwd, panes }: the tabs to open on start (right-click > Tabs > Save)
+  world: '',                  // the world to start in; blank = NYX decides
+  nyxWorlds: true,            // false: NYX never changes the world, only you do
+  cigarette: true,            // the cigarette that burns while you compile
   fontFamily: "'Cascadia Mono', Consolas, 'Courier New', monospace",
   fontSize: 15,
   framed: true,               // false: the terminal fills the window, the scene shows through
@@ -64,6 +70,12 @@ function loadConfig() {
 }
 
 let win, cfg, home = os.homedir();
+// Remember one setting in config.json (and for this session). Shots never touch the user's config.
+function writeCfg(key, v) {
+  cfg[key] = key === 'music' ? { ...cfg.music, ...v } : v;
+  if (SHOT) return;
+  try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u[key] = v; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* config unreadable: keep it for this session */ }
+}
 const panes = new Map(); // pane id -> { term, cwd }
 
 // Screenshots must not show the real machine: no home folder, no username, no hostname.
@@ -110,18 +122,68 @@ function demoShell(c) {
   return { ...c, shell: 'bash', shellArgs: ['--norc', '--noprofile'] };
 }
 
-function spawnShell(id) {
-  const pane = panes.get(id) || { cwd: home };
-  panes.set(id, pane);
-  const term = pane.term = pty.spawn(cfg.shell, cfg.shellArgs, {
-    name: 'xterm-256color', cols: 100, rows: 30, cwd: pane.cwd,
-    env: { ...process.env, TERM_PROGRAM: 'GIBSON', ...(SHOT ? { PS1: 'hacker@gibson:~$ ' } : {}) },
-  });
+// Shell profiles: the ones installed here, plus any in config.json (same name replaces).
+function onPath(exe) {
+  return (process.env.PATH || '').split(path.delimiter).some((d) => { try { return d && fs.statSync(path.join(d, exe)).isFile(); } catch { return false; } });
+}
+const exists = (f) => { try { return fs.statSync(f).isFile(); } catch { return false; } };
+function detectShells() {
+  const out = [];
+  if (process.platform === 'win32') {
+    const pf = process.env.ProgramFiles || 'C:\\Program Files';
+    out.push({ name: 'PowerShell', shell: 'powershell.exe', args: ['-NoLogo'] });
+    const pwsh = onPath('pwsh.exe') ? 'pwsh.exe' : path.join(pf, 'PowerShell', '7', 'pwsh.exe');
+    if (pwsh === 'pwsh.exe' || exists(pwsh)) out.push({ name: 'PowerShell 7', shell: pwsh, args: ['-NoLogo'] });
+    out.push({ name: 'Command Prompt', shell: 'cmd.exe', args: [] });
+    if (onPath('wsl.exe')) out.push({ name: 'WSL', shell: 'wsl.exe', args: [] });
+    const gitBash = path.join(pf, 'Git', 'bin', 'bash.exe');
+    if (exists(gitBash)) out.push({ name: 'Git Bash', shell: gitBash, args: ['--login', '-i'] });
+  } else {
+    let list = []; try { list = fs.readFileSync('/etc/shells', 'utf8').split('\n').filter((l) => l.startsWith('/')); } catch { /* no list */ }
+    const seen = new Set();
+    for (const s of [process.env.SHELL || '/bin/bash', ...list]) {
+      const name = path.basename(s); if (seen.has(name) || !exists(s)) continue;
+      seen.add(name); out.push({ name, shell: s, args: [] });
+    }
+  }
+  return out;
+}
+let profiles = [];
+const findProfile = (name) => profiles.find((p) => p.name === name);
+// The default: defaultShell by name, else the profile running the legacy `shell` setting.
+function defaultProfile() {
+  return findProfile(cfg.defaultShell) || profiles.find((p) => path.basename(p.shell).toLowerCase() === path.basename(cfg.shell).toLowerCase())
+    || { name: path.basename(cfg.shell), shell: cfg.shell, args: cfg.shellArgs };
+}
+const isDir = (d) => { try { return !!d && fs.statSync(d).isDirectory(); } catch { return false; } };
+
+function spawnShell(id, opts) {
+  let pane = panes.get(id);
+  if (!pane) {
+    const prof = (!SHOT && findProfile(opts && opts.profile)) || defaultProfile();
+    const cwd = [opts && opts.cwd, prof.cwd].find(isDir) || home;
+    pane = { cwd, prof: SHOT ? { shell: cfg.shell, args: cfg.shellArgs } : prof };
+    panes.set(id, pane);
+  }
   const send = (d) => win && !win.isDestroyed() && win.webContents.send('pty:data', id, d);
+  let term;
+  try {
+    term = pane.term = pty.spawn(pane.prof.shell, pane.prof.args || [], {
+      name: 'xterm-256color', cols: 100, rows: 30, cwd: pane.cwd,
+      env: { ...process.env, TERM_PROGRAM: 'GIBSON', ...(SHOT ? { PS1: 'hacker@gibson:~$ ' } : {}) },
+    });
+  } catch (e) { // a profile pointing at a shell that is not there
+    send(`\x1b[31m-- cannot start ${pane.prof.shell}: ${e.message} --\x1b[0m\r\n`);
+    const d = defaultProfile(); if (pane.prof.shell === d.shell) return;
+    pane.prof = d; return spawnShell(id);
+  }
+  const born = Date.now();
   term.onData(send);
   term.onExit(() => {
     if (pane.closed || pane.term !== term) return; // closed on purpose
-    send('\r\n\x1b[35m-- NO CARRIER --\x1b[0m\r\n'); spawnShell(id);
+    send('\r\n\x1b[35m-- NO CARRIER --\x1b[0m\r\n');
+    if (Date.now() - born < 2000) return send('\x1b[35m-- the shell quit right away, so no redial. Close this tab or pick another shell. --\x1b[0m\r\n');
+    spawnShell(id);
   });
 }
 function killShell(id) {
@@ -166,6 +228,9 @@ function listDir(dir) {
 const CODEKEYS = { BracketRight: 'music:next', BracketLeft: 'music:prev', Equal: 'music:volup', Minus: 'music:voldown' };
 const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'frame', S: 'scroller', L: 'logo', D: 'packets', P: 'music:toggle', J: 'music:source' };
 
+// New tab with a given shell: one item per profile.
+const shellItems = (act) => profiles.map((p) => ({ label: p.name + (p.name === defaultProfile().name ? '  (default)' : ''), click: act('newtab:' + p.name) }));
+
 // Right-click menu. The page sends its current state; clicks come back as hotkey actions.
 function contextMenu(st) {
   const act = (a) => () => win.webContents.send('hotkey', a);
@@ -174,9 +239,21 @@ function contextMenu(st) {
     item('Copy', 'copy', 'C', { enabled: st.selection }), item('Paste', 'paste', 'V'),
     { type: 'separator' },
     item('New tab', 'newtab', 'T'),
+    { label: 'New tab with', submenu: shellItems(act) },
     item('Close tab', 'closetab', 'X'),
+    { label: 'Tabs', submenu: [
+      { label: 'Open these tabs on start', click: act('tabs:save') },
+      { label: `Forget the start tabs${cfg.startupTabs.length ? ` (${cfg.startupTabs.length})` : ''}`, enabled: cfg.startupTabs.length > 0, click: () => writeCfg('startupTabs', []) },
+      { type: 'separator' },
+      { label: 'Default shell', submenu: profiles.map((p) => ({ label: p.name, type: 'radio', checked: p.name === defaultProfile().name, click: () => writeCfg('defaultShell', p.name) })) },
+    ] },
     { label: 'Panes', submenu: [1, 2, 3, 4].map((n) => ({ label: `${n}`, type: 'radio', checked: n === st.panes, accelerator: `Ctrl+Shift+${n}`, registerAccelerator: false, click: act('panes:' + n) })) },
-    { label: 'World', submenu: st.worlds.map(([key, label]) => ({ label, type: 'radio', checked: key === st.world, click: act('world:' + key) })) },
+    { label: 'World', submenu: [
+      ...st.worlds.map(([key, label]) => ({ label: key === cfg.world ? label + '  (start)' : label, type: 'radio', checked: key === st.world, click: act('world:' + key) })),
+      { type: 'separator' },
+      { label: 'Start in this world', type: 'checkbox', checked: cfg.world === st.world, click: () => { writeCfg('world', cfg.world === st.world ? '' : st.world); } },
+      { label: 'NYX picks the world', type: 'checkbox', checked: cfg.nyxWorlds !== false, click: act('nyxworlds') },
+    ] },
     { type: 'separator' },
     { label: 'Music', submenu: [
       item('On', 'music', 'M', { type: 'checkbox', checked: st.music }),
@@ -197,6 +274,7 @@ function contextMenu(st) {
     item('Scroller', 'scroller', 'S', { type: 'checkbox', checked: st.scroller }),
     item('Logo', 'logo', 'L', { type: 'checkbox', checked: st.logo }),
     item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
+    { label: 'Cigarette while compiling', type: 'checkbox', checked: cfg.cigarette !== false, click: act('cigarette') },
     item('NYX', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
     item('Matrix rain', 'rain', 'R'),
     { type: 'separator' },
@@ -255,24 +333,31 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'gibson-music', privileges: { st
 app.whenReady().then(() => {
   cfg = loadConfig();
   if (MUSIC) cfg.music = { ...cfg.music, source: 'folder', folder: path.resolve(MUSIC) };
-  if (SHOT) { cfg = { ...demoShell(cfg), framed: true, opacity: 0.86, scroller: true, logo: true, music: MUSIC ? cfg.music : { ...cfg.music, source: 'synth' } }; home = demoHome(); } // shots ignore saved view choices
+  profiles = detectShells();
+  for (const p of cfg.profiles || []) if (p && p.name && p.shell) { const i = profiles.findIndex((x) => x.name === p.name); if (i >= 0) profiles[i] = p; else profiles.push(p); }
+  if (SHOT) { cfg = { ...demoShell(cfg), startupTabs: [], world: '', nyxWorlds: true, cigarette: true, framed: true, opacity: 0.86, scroller: true, logo: true, music: MUSIC ? cfg.music : { ...cfg.music, source: 'synth' } }; home = demoHome(); } // shots ignore saved view choices
   ipcMain.handle('boot', () => ({
     cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined } },
     user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, tabs: TABS, chat: CHAT, unframed: UNFRAMED,
+    startTabs: cfg.startupTabs, defaultShell: SHOT ? '' : defaultProfile().name,
     shot: !!SHOT, world: WORLD, mute: MUTE, bootShot: argv.includes('--boot'),
   }));
-  ipcMain.on('pty:open', (_e, id) => { if (!panes.has(id)) spawnShell(id); });
+  ipcMain.on('pty:open', (_e, id, opts) => { if (!panes.has(id)) spawnShell(id, opts); });
   ipcMain.on('pty:close', (_e, id) => killShell(id));
-  ipcMain.on('pty:write', (_e, id, d) => { const p = panes.get(id); if (p) p.term.write(d); });
+  ipcMain.on('pty:write', (_e, id, d) => { const p = panes.get(id); if (p && p.term) p.term.write(d); });
   ipcMain.on('pty:resize', (_e, id, c, r) => { try { panes.get(id).term.resize(c, r); } catch { /* shell restarting */ } });
   ipcMain.on('pty:line', (_e, id, line) => { const p = panes.get(id); if (p) trackCd(p, line); });
   ipcMain.handle('fs:list', (_e, id) => { const d = (panes.get(id) || { cwd: home }).cwd; return { cwd: SHOT ? 'C:\\GIBSON' : d, entries: listDir(d) }; });
   ipcMain.on('cfg:save', (_e, key, v) => { // view choices remembered across restarts
-    if (SHOT) return; // screenshots never touch the user's config
-    if (!['opacity', 'framed', 'scroller', 'logo', 'packets', 'music'].includes(key)) return;
-    cfg[key] = key === 'music' ? { ...cfg.music, ...v } : v;
-    try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u[key] = v; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* config unreadable: keep it for this session */ }
+    if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'cigarette'].includes(key)) writeCfg(key, v);
   });
+  // The tabs as they are now become the start tabs. The page sends each tab's first pane id
+  // and pane count; the shell and folder are known here.
+  ipcMain.on('tabs:save', (_e, list) => {
+    const tabs = list.map((t) => { const p = panes.get(t.id); return p && { profile: p.prof.name, cwd: p.cwd, panes: t.panes }; }).filter(Boolean);
+    writeCfg('startupTabs', tabs);
+  });
+  ipcMain.on('menu:shells', () => Menu.buildFromTemplate(shellItems((a) => () => win.webContents.send('hotkey', a))).popup({ window: win }));
   ipcMain.handle('git:log', (_e, id) => gitLog((panes.get(id) || { cwd: home }).cwd));
   ipcMain.handle('sys:net', () => (SHOT ? DEMO_NET() : sys.netConns()));
   ipcMain.handle('sys:procs', () => (SHOT ? DEMO_PROCS() : sys.procs()));

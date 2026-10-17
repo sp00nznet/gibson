@@ -8,7 +8,8 @@
   const act = new Activity();
   const worldEnv = { fs: null, git: null, net: null, procs: null, news: null };
   const refreshGit = (p) => window.gibson.gitLog(p.id).then((g) => { worldEnv.git = g; });
-  const go = (w) => { if (!B.world) Worlds.go(w); };
+  // NYX changes the world unless --world pins it (screenshots) or the user turned that off.
+  const go = (w) => { if (!B.world && cfg.nyxWorlds !== false && w) Worlds.go(Array.isArray(w) ? w[Math.floor(Math.random() * w.length)] : w); };
   let music = null, pulse = 0, warp = 0;
 
   // --- terminals: 1 to 4 tiled panes. Each pane has its own shell. ---------
@@ -26,11 +27,13 @@
   const tabs = []; let tab = null, focused = null, nextId = 1, nextTab = 1;
   const allPanes = () => tabs.flatMap((t) => t.panes);
 
-  function makeTab() {
-    const t = { n: nextTab++, panes: [], focused: null, cwdName: '', el: document.createElement('div'), btn: document.createElement('button') };
+  // opts: { profile, cwd } for the tab's shells; blank means the default shell in the home folder.
+  function makeTab(opts) {
+    const t = { n: nextTab++, panes: [], focused: null, cwdName: '', opts: opts || {}, el: document.createElement('div'), btn: document.createElement('button') };
     t.el.className = 'tab n1'; $('termwrap').appendChild(t.el);
     t.btn.className = 'tabbtn'; t.btn.title = 'middle-click closes';
-    t.btn.onclick = () => switchTab(t);
+    t.btn.innerHTML = '<span class="lbl"></span><span class="x" title="close tab">×</span>';
+    t.btn.onclick = (e) => { if (e.target.classList.contains('x')) closeTab(t); else switchTab(t); };
     t.btn.onauxclick = (e) => { if (e.button === 1) closeTab(t); };
     $('tabs').insertBefore(t.btn, $('newtab'));
     tabs.push(t); makePane(t); label(t);
@@ -38,7 +41,8 @@
     return t;
   }
   function label(t) {
-    t.btn.textContent = `${t.n}:${t.cwdName || 'shell'}${t.panes.length > 1 ? ' [' + t.panes.length + ']' : ''}`;
+    const shell = t.opts.profile && t.opts.profile !== B.defaultShell ? ` (${t.opts.profile})` : '';
+    t.btn.firstChild.textContent = `${t.n}:${t.cwdName || 'shell'}${shell}${t.panes.length > 1 ? ' [' + t.panes.length + ']' : ''}`;
   }
   function switchTab(t) {
     tab = t;
@@ -67,7 +71,7 @@
     try { const gl = new WebglAddon.WebglAddon(); gl.onContextLoss(() => gl.dispose()); term.loadAddon(gl); } catch { /* DOM renderer is fine */ }
     const chat = document.createElement('div'); chat.className = 'nyxchat'; el.appendChild(chat);
     const p = { id, el, term, tab: t, chat, line: '', lastCmd: '', outTail: '', errorSeen: false };
-    window.gibson.open(id);
+    window.gibson.open(id, t.opts);
     const doFit = () => { try { fit.fit(); window.gibson.resize(id, term.cols, term.rows); } catch { /* hidden */ } };
     p.ro = new ResizeObserver(doFit); p.ro.observe(el); doFit();
     term.textarea.addEventListener('focus', () => setFocus(p));
@@ -149,6 +153,7 @@
     }, 250);
     if (/^git\b/i.test(cmd)) setTimeout(() => refreshGit(p), 1200); // new commits ignite in the galaxy
     if (cmd) setTimeout(() => { if (!p.errorSeen && p.lastCmd === cmd) Worlds.signal('ok'); }, 1500);
+    if (/hack\s+the\s+planet/i.test(cmd) && !B.world) Worlds.go('hack');
     $('frame').style.setProperty('--warp', 1); warp = 1; // the Enter lunge
     nyx.command(cmd);
   }
@@ -162,6 +167,7 @@
       return d;
     };
     add('you', '> ' + (message || 'nyx'));
+    if (/hack\s+the\s+planet/i.test(message) && !B.world) Worlds.go('hack');
     const reply = add('her', 'NYX> ...');
     p.chat.classList.add('show'); clearTimeout(p.chatHide);
     const line = await nyx.chat(message);
@@ -169,7 +175,10 @@
     p.chatHide = setTimeout(() => p.chat.classList.remove('show'), 30000);
   }
 
-  switchTab(makeTab());
+  if (B.startTabs.length && !B.shot) { // the saved start tabs
+    for (const s of B.startTabs) { const t = makeTab({ profile: s.profile, cwd: s.cwd }); if (s.panes > 1) { switchTab(t); setPanes(s.panes); } }
+    switchTab(tabs[0]);
+  } else switchTab(makeTab());
   if (B.panes > 1) setPanes(B.panes);
   for (let i = 1; i < (B.tabs || 1); i++) makeTab();
   if (B.tabs > 1) switchTab(tabs[0]);
@@ -185,7 +194,7 @@
       $('nyx').classList.remove('glitch'); void $('nyx').offsetWidth; $('nyx').classList.add('glitch');
       const iv = setInterval(() => { el.textContent = text.slice(0, ++i); if (i >= text.length) clearInterval(iv); }, 28);
       scroll = scrollBase + `NYX SAYS: ${text.toUpperCase()}  ::  `;
-      if (world && !B.world) Worlds.go(world); // --world pins it (screenshots)
+      go(world);
       if (cfg.nyx.voice && window.speechSynthesis) {
         const u = new SpeechSynthesisUtterance(text); u.pitch = 0.55; u.rate = 1.02;
         const v = speechSynthesis.getVoices().find((x) => /zira|female|aria|jenny/i.test(x.name)); if (v) u.voice = v;
@@ -196,14 +205,14 @@
 
   // --- worlds + fx ------------------------------------------------------------
   worldEnv.fs = await window.gibson.listDir(focused.id);
-  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news, packets: cfg.packets !== false }));
+  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news, packets: cfg.packets !== false, home: B.shot ? [40.7, -74] : null }));
 
   // --- live data: polled fast while its world is showing, slowly otherwise, so NYX can react ---
   const services = new Set(), hogs = new Map(), titles = new Set();
   let netAt = 0, procAt = 0;
   setInterval(async () => {
     const now = Date.now(), w = Worlds.current();
-    if (now - netAt > (w === 'net' ? 3000 : 20000)) {
+    if (now - netAt > (w === 'net' || w === 'traffic' ? 3000 : 20000)) {
       netAt = now; const first = !worldEnv.net; worldEnv.net = await window.gibson.net();
       for (const c of worldEnv.net) if (!services.has(c.service)) { // a kind of connection not seen this session
         services.add(c.service); if (!first) nyx.event('net', { detail: `a new connection to ${c.service}` }, false);
@@ -223,9 +232,9 @@
     worldEnv.news = items;
     if (!first && fresh.length) { Worlds.signal('news'); nyx.event('news', { headline: fresh[0].title, detail: fresh[0].source }, false); }
   });
-  if (B.world) Worlds.go(B.world);
+  if (B.world || cfg.world) Worlds.go(B.world || cfg.world);
   Fx.start({ logo: $('logo'), scroller: $('scroller'), rain: $('rain'), smoke: $('smoke') },
-    () => ({ pulse, level: act.level(), smoking: act.busyOut > 4, scroll }));
+    () => ({ pulse, level: act.level(), smoking: act.busyOut > 4, cig: cfg.cigarette !== false, scroll }));
 
   // --- hotkeys + right-click menu: main.js catches the keys, both land here ----
   const OPACITY = [1, 0.86, 0.7, 0.5, 0.3, 0.15, 0];
@@ -286,6 +295,9 @@
     }
     else if (a.startsWith('music:')) return musicAction(a);
     else if (a === 'logo') { setLogo(!cfg.logo); window.gibson.save('logo', cfg.logo); }
+    else if (a === 'cigarette') { cfg.cigarette = cfg.cigarette === false; window.gibson.save('cigarette', cfg.cigarette); }
+    else if (a === 'nyxworlds') { cfg.nyxWorlds = cfg.nyxWorlds === false; window.gibson.save('nyxWorlds', cfg.nyxWorlds); }
+    else if (a === 'tabs:save') { window.gibson.saveTabs(tabs.map((x) => ({ id: x.panes[0].id, panes: x.panes.length }))); nyx.ctx.say(`${tabs.length} tab${tabs.length > 1 ? 's' : ''} saved. They will be waiting next time.`, 'tender'); }
     else if (a === 'packets') { cfg.packets = cfg.packets === false; window.gibson.save('packets', cfg.packets); }
     else if (a === 'tempo') { cfg.music.mode = cfg.music.mode === 'reactive' ? 'fixed' : 'reactive'; nyx.ctx.say(`Tempo ${cfg.music.mode === 'fixed' ? 'locked at ' + cfg.music.bpm : 'follows your hands'}.`, 'playful'); }
     else if (a === 'nyx') { cfg.nyx.on = !cfg.nyx.on; $('nyx').style.opacity = cfg.nyx.on ? 1 : 0.3; }
@@ -300,6 +312,7 @@
     }
     else if (a.startsWith('panes:')) return setPanes(Number(a.slice(6)));
     else if (a === 'newtab') return switchTab(makeTab());
+    else if (a.startsWith('newtab:')) return switchTab(makeTab({ profile: a.slice(7) }));
     else if (a === 'closetab') return closeTab(tab);
     else if (a === 'nexttab') return stepTab(1);
     else if (a === 'prevtab') return stepTab(-1);
@@ -308,6 +321,7 @@
   }
   window.gibson.onHotkey(action);
   $('newtab').onclick = () => action('newtab');
+  $('shells').onclick = () => window.gibson.shellMenu();
   addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const p = tab.panes.find((x) => x.el.contains(e.target)); if (p) p.term.focus();

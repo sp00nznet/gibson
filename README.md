@@ -29,7 +29,7 @@ It is mostly for fun. But some of it is genuinely handy:
 
 ## Status
 
-**0.7.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
+**0.8.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
 are produced and smoke-tested by CI, but nobody has lived in them yet.
 
 | | |
@@ -37,7 +37,8 @@ are produced and smoke-tested by CI, but nobody has lived in them yet.
 | Real shell (node-pty), xterm.js 6 with WebGL, links, Unicode 11 | done |
 | Tabs, each with 1 to 4 tiled panes; per-pane opacity; framed or full-window; hideable logo and scroller | done |
 | Talk to NYX from any pane: `nyx <message>` | done |
-| Twenty-two wireframe worlds, three of them live system data and one your RSS feeds | done |
+| Twenty-five wireframe worlds, five of them live system data or your RSS feeds | done |
+| Shell profiles (PowerShell, PowerShell 7, cmd, WSL, Git Bash, your own); start tabs that reopen in their folders | done |
 | Reactive synth soundtrack, 84 to 162 BPM, following your activity | done |
 | Jukebox: your own music folder, with controls, visuals pumping on its beat | done |
 | Modem dial-in on startup (DTMF, answer tone, handshake screech) | done |
@@ -58,7 +59,8 @@ is anyone's real machine.
 | ![Light cycles](docs/screenshots/cycles.png) **LIGHT CYCLES**: six riders, one arena | ![Battlezone](docs/screenshots/battlezone.png) **BATTLEZONE**: vector tanks and a radar sweep |
 | ![Four panes, four opacities](docs/screenshots/tiled.png) **Four panes**, each at its own opacity | ![Full window](docs/screenshots/unframed.png) **Full window**: no frame, the planet behind your panes |
 | ![Space battle](docs/screenshots/battle.png) **DEEP SPACE**: fleets trading lasers | ![Data tunnel](docs/screenshots/tunnel.png) **DATASTREAM**: down the wire |
-| ![Flying toasters](docs/screenshots/toasters.png) **FLYING TOASTERS**: and toast, some of it burnt | |
+| ![Flying toasters](docs/screenshots/toasters.png) **FLYING TOASTERS**: and toast, some of it burnt | ![Hack the planet](docs/screenshots/hack.png) **HACK THE PLANET**: the Earth, a Jolly Roger floppy, the words going round |
+| ![World news on a globe](docs/screenshots/newsglobe.png) **WORLD NEWS**: headlines pop up where they happened | ![Your traffic on a globe](docs/screenshots/traffic.png) **TRAFFIC MAP**: your connections arcing out from home |
 
 Also in the box: THE GRID, NEON CITY, ORBIT, RAVE WAREHOUSE, GIT GALAXY, HIGHWAY, DEEP SEA,
 PROCESS HIVE, 3D PIPES, 3D MAZE and THE STREET.
@@ -142,7 +144,8 @@ Everything below is also on the **right-click menu**.
 | Key | Does |
 |---|---|
 | `nyx <message>` | type it (or recall it with Up) in any pane and press Enter: NYX answers; the shell never runs it |
-| `Ctrl+Shift+T` / `Ctrl+Shift+X` | new tab / close tab (or the `+` button; middle-click a tab to close it) |
+| `Ctrl+Shift+T` / `Ctrl+Shift+X` | new tab / close tab (or the `+` button, and the `x` on each tab or a middle-click) |
+| `▾` next to `+` | new tab with another shell: PowerShell, PowerShell 7, cmd, WSL, Git Bash, whatever is installed |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | next / previous tab (also `Ctrl+PageDown` / `Ctrl+PageUp`) |
 | `Ctrl+Shift+1`..`4` | that many panes in this tab. Shrinking keeps the focused pane |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | copy / paste |
@@ -188,19 +191,27 @@ about your taste.
 | GIT GALAXY | any `git` command (your repo's last 150 commits; new ones ignite) |
 | ICE WALL | an error (it cracks open when the next command works) |
 | GIBSON CORE | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
-| RAVE WAREHOUSE | a typing streak |
+| RAVE WAREHOUSE, HACK THE PLANET | a typing streak (or type `hack the planet`) |
 | 3D PIPES | a long build (the screensaver while you wait) |
 | 3D MAZE | you go idle (the screensaver kicks in) |
-| NETWATCH | a kind of connection you haven't made this session |
+| NETWATCH, TRAFFIC MAP | a kind of connection you haven't made this session |
 | PROCESS HIVE | a program hogging the CPU |
-| NEWSWIRE | a fresh headline on your feeds |
+| NEWSWIRE, WORLD NEWS | a fresh headline on your feeds |
 | LIGHT CYCLES | NYX feeling playful |
 | HIGHWAY, NEON CITY, DEEP SPACE, THE GRID | NYX's other moods |
 | FLYING TOASTERS | NYX feeling tender, or the menu |
 | DATASTREAM, ORBIT, DEEP SEA, THE STREET, BATTLEZONE | the menu or `Ctrl+Shift+W` |
 
+Want one world and no surprises? Right-click > World > **Start in this world** makes the current
+one your default, and unticking **NYX picks the world** stops her moving you anywhere.
+
+The TRAFFIC MAP places addresses by which internet registry owns their block (Americas, Europe,
+Asia-Pacific, Latin America, Africa), not by geoip: nothing is looked up or sent anywhere, and it
+is continent-level at best. Home is guessed from your clock's time zone.
+
 **Settings** live in `config.json`, created on first run. The view choices (opacity, frame, logo,
-scroller, packets) and the music choices are remembered for you; everything else you edit by hand
+scroller, packets, cigarette, start world, default shell, start tabs) and the music choices are
+remembered for you; everything else you edit by hand
 ("Open config.json" on the right-click menu), then restart.
 
 | System | Path |
@@ -211,7 +222,12 @@ scroller, packets) and the music choices are remembered for you; everything else
 
 ```json
 {
-  "shell": "powershell.exe",
+  "defaultShell": "PowerShell",
+  "profiles": [{ "name": "recomp", "shell": "wsl.exe", "args": [], "cwd": "G:\recomp" }],
+  "startupTabs": [{ "profile": "PowerShell", "cwd": "F:\projects", "panes": 1 }, { "profile": "WSL", "cwd": "G:\recomp", "panes": 2 }],
+  "world": "",
+  "nyxWorlds": true,
+  "cigarette": true,
   "boot": true,
   "framed": true,
   "logo": true,
@@ -225,8 +241,17 @@ scroller, packets) and the music choices are remembered for you; everything else
 }
 ```
 
-- `shell`: `pwsh.exe`, `cmd.exe`, `wsl.exe`, `bash`, `zsh`... `shellArgs` passes arguments.
-  The default is PowerShell on Windows and `$SHELL` elsewhere.
+- **Shells.** GIBSON finds the installed ones (Windows: PowerShell, PowerShell 7, Command Prompt,
+  WSL, Git Bash; elsewhere: everything in `/etc/shells`). Pick the default with right-click >
+  Tabs > Default shell (saved as `defaultShell`), or open a tab in any of them from the `▾`
+  button. `profiles` adds your own (`name`, `shell`, `args`, optional starting `cwd`); one with the
+  same name as a found shell replaces it. The old `shell` / `shellArgs` settings still work as the
+  default when `defaultShell` is blank.
+- **Start tabs.** Set your tabs up (shell, folder, panes), then right-click > Tabs > **Open these
+  tabs on start**. Next launch they come back in the same shells and folders. Or write
+  `startupTabs` by hand. "Forget the start tabs" goes back to one default tab.
+- `world`: the world to start in (blank: NYX decides). `nyxWorlds: false` keeps you there.
+- `cigarette`: the one that burns while you compile (also on the right-click menu).
 - `music.source`: `synth` or `folder` (the jukebox, playing `music.folder`).
 - `news.feeds`: any RSS or Atom URLs, fetched every `news.minutes`. `[]` turns the newswire off
   (nothing is fetched).
@@ -247,7 +272,7 @@ npx electron . --shot out.png --world battle --panes 2 --unframed --at 8
 
 `--shot` renders offscreen and saves a PNG (works over RDP; no window opens). `--world` is one of
 `grid`, `city`, `files`, `battle`, `planet`, `tunnel`, `core`, `bbs`, `rave`, `git`, `ice`,
-`highway`, `sea`, `pipes`, `maze`, `cycles`, `battlezone`, `street`, `net`, `hive`, `news`, `toasters`;
+`highway`, `sea`, `pipes`, `maze`, `cycles`, `battlezone`, `street`, `net`, `hive`, `news`, `toasters`, `newsglobe`, `traffic`, `hack`;
 `--tabs 3` opens three tabs and `--chat "are you real?"` types `nyx are you real?` into the first
 pane. Shot mode uses a made-up folder, user, connections, programs and headlines, so a capture
 never shows your machine. `npm run shots` regenerates everything in `docs/screenshots/`.

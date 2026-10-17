@@ -59,7 +59,14 @@ assert.equal(NYX_KIND('git push'), 'git');
 assert.equal(NYX_KIND('cls'), 'clear');
 assert.equal(NYX_KIND('npm run build'), 'cmd');
 for (const m of MOODS) assert.ok(MOOD_WORLD[m], `mood ${m} has a world`);
-for (const w of [...Object.values(MOOD_WORLD), ...Object.values(EVENT_WORLD)]) assert.ok(Worlds.names.includes(w), `world ${w} exists`);
+for (const w of [...Object.values(MOOD_WORLD), ...Object.values(EVENT_WORLD)].flat()) assert.ok(Worlds.names.includes(w), `world ${w} exists`);
+
+// --- the globes: where a headline happened, which registry an address belongs to ---
+const { placeOf, registryOf } = Worlds.geo;
+const [mlat, mlon] = placeOf('Kremlin denies everything');
+assert.ok(Math.abs(mlat - 55.8) < 3 && Math.abs(mlon - 37.6) < 3, 'Moscow');
+assert.ok(Math.abs(placeOf('North Korean hackers hit exchange')[1] - 125.8) < 3, 'north korea before korea');
+assert.deepEqual(['81.2.3.4', '1.1.1.1', '8.8.8.8', '200.1.1.1', '41.1.1.1', '2a00::1', '115.1.1.1'].map(registryOf), ['ripe', 'apnic', 'arin', 'lacnic', 'afrinic', 'ripe', 'apnic']);
 
 // --- git galaxy lanes: main line in lane 0, a branch gets its own lane until it merges ---
 const lanes = Worlds.gitLanes([

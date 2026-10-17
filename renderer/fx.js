@@ -65,6 +65,7 @@
   // better; this keeps the repo asset-free.
   function drawSmoke(e) {
     fit(smoke); const W = smoke.width, H = smoke.height; smg.clearRect(0, 0, W, H);
+    if (!e.cig) { cig.lit = false; smokeP = []; return; } // turned off in the menu
     if (e.smoking && !cig.lit) { cig = { lit: true, burn: 0, glow: 1, life: 1, ash: 0 }; }
     if (!cig.lit) return;
     cig.burn = Math.min(1, cig.burn + e.dt / (e.smoking ? 120 : 400));
@@ -86,8 +87,17 @@
     smg.fillStyle = `rgba(255,${80 + glow * 60},20,${glow})`; smg.shadowColor = '#ff5a14'; smg.shadowBlur = 14 * glow;
     smg.fillRect(tip + cig.ash, y - 2, 4, 9); smg.shadowBlur = 0;
     if (Math.random() < 0.5) smokeP.push({ x: tip + cig.ash + 2, y: y - 2, r: 2, a: 0.35, s: Math.random() * 6 });
+    // Now and then the smoke curls into a heart: puffs on the heart curve that drift as one.
+    if (Math.random() < e.dt / 30) {
+      for (let i = 0; i < 36; i++) {
+        const a = (i / 36) * Math.PI * 2, hx = 16 * Math.sin(a) ** 3, hy = 13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a);
+        smokeP.push({ x: tip + cig.ash + hx * 1.5, y: y - 70 - hy * 1.5, r: 2.5, a: 0.3, heart: true });
+      }
+    }
     for (const p of smokeP) {
-      p.y -= 22 * e.dt; p.r += 7 * e.dt; p.a -= 0.07 * e.dt; p.x += Math.sin(t * 1.3 + p.s + p.y * 0.04) * 18 * e.dt;
+      if (p.heart) { p.y -= 12 * e.dt; p.r += 1.6 * e.dt; p.a -= 0.045 * e.dt; p.x += Math.sin(t * 0.9) * 5 * e.dt; } else {
+        p.y -= 22 * e.dt; p.r += 7 * e.dt; p.a -= 0.07 * e.dt; p.x += Math.sin(t * 1.3 + p.s + p.y * 0.04) * 18 * e.dt;
+      }
       smg.fillStyle = `rgba(190,200,210,${Math.max(0, p.a) * cig.life})`; smg.beginPath(); smg.arc(p.x, p.y, p.r, 0, Math.PI * 2); smg.fill();
     }
     smokeP = smokeP.filter((p) => p.a > 0 && p.y > -40);
