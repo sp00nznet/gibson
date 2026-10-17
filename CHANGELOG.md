@@ -4,6 +4,20 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-17
+
+### Added
+- Seven worlds: GIBSON CORE (the mainframe), BBS LOBBY (a 90s board with a download that never
+  finishes), RAVE WAREHOUSE (speakers and crowd on the kick, laser fans), GIT GALAXY (the focused
+  pane's repository as spiral arms, new commits ignite), ICE WALL (flares red on errors, cracks
+  open on success), HIGHWAY (night drive) and DEEP SEA (sunken racks, cable kelp, data fish).
+- Events have worlds of their own: boot goes to the BBS, git to the galaxy, errors to the ICE,
+  `ssh` / `sudo` / dangerous commands to the core, typing streaks to the rave.
+- `Worlds.signal()`: worlds can react to a command working or failing.
+
+### Changed
+- Going idle drives the HIGHWAY instead of THE GRID; NYX's moods map onto the new worlds too.
+
 ## [0.3.2] - 2026-10-17
 
 ### Fixed

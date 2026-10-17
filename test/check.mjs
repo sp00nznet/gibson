@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { Activity, layers, SLOW_BPM, FAST_BPM } = require('../renderer/activity.js');
-const { NYX_KIND, MOOD_WORLD } = require('../renderer/nyx.js');
+const { NYX_KIND, MOOD_WORLD, EVENT_WORLD } = require('../renderer/nyx.js');
+const { Worlds } = require('../renderer/worlds.js');
 const { llmLine, parse, MOODS } = require('../llm.js');
 
 // --- tempo follows the hands ---
@@ -41,6 +42,13 @@ assert.equal(NYX_KIND('git push'), 'git');
 assert.equal(NYX_KIND('cls'), 'clear');
 assert.equal(NYX_KIND('npm run build'), 'cmd');
 for (const m of MOODS) assert.ok(MOOD_WORLD[m], `mood ${m} has a world`);
+for (const w of [...Object.values(MOOD_WORLD), ...Object.values(EVENT_WORLD)]) assert.ok(Worlds.names.includes(w), `world ${w} exists`);
+
+// --- git galaxy lanes: main line in lane 0, a branch gets its own lane until it merges ---
+const lanes = Worlds.gitLanes([
+  { h: 'm', p: ['c', 'b2'] }, { h: 'b2', p: ['b1'] }, { h: 'c', p: ['a'] }, { h: 'b1', p: ['a'] }, { h: 'a', p: [] },
+]).map((c) => c.lane);
+assert.deepEqual(lanes, [0, 1, 0, 1, 0], `lanes ${lanes}`);
 
 // --- LLM replies ---
 assert.deepEqual(parse('[taunting] Nice typo, insect.'), { text: 'Nice typo, insect.', mood: 'taunting' });

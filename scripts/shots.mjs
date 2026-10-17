@@ -8,6 +8,7 @@ const SHOTS = [
   ['files', 'files', 1], ['battle', 'battle', 1], ['city', 'city', 1], ['tunnel', 'tunnel', 1],
   ['tiled', 'grid', 4], ['unframed', 'planet', 2, '--unframed'],
   ['tabs', 'city', 2, '--tabs', '3', '--chat', 'are you real?'],
+  ['core', 'core', 1], ['bbs', 'bbs', 1], ['ice', 'ice', 1],
 ];
 for (const [name, world, panes, ...extra] of SHOTS) {
   execFileSync(electron, ['.', '--shot', `docs/screenshots/${name}.png`, '--world', world, '--panes', String(panes), '--at', '16', ...extra], { stdio: 'inherit' });

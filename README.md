@@ -1,15 +1,15 @@
 # GIBSON
 
 A cracktro you can work in. A real terminal sits in the middle of the screen, framed by
-wireframe worlds: your own filesystem as a Hackers-style city, space battles, a neon skyline, a
-ringed planet, a data tunnel. A synthesized techno/industrial soundtrack speeds up when you work
+wireframe worlds: your own filesystem as a Hackers-style city, your git history as a galaxy, the
+Gibson mainframe, a 90s BBS, a rave, black ICE, space battles, a night highway and more. A synthesized techno/industrial soundtrack speeds up when you work
 hard and settles down when you stop. Watching it all is **NYX**, the unseen sysop: she greets
 you, needles you about typos, roots for you anyway, and changes the world behind the terminal to
 suit her mood. A local or hosted LLM can write her lines; without one she has her own.
 
 ## Status
 
-**0.3.2, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
+**0.4.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
 builds are produced and smoke-tested by CI, but nobody has used them day to day yet.
 
 | | |
@@ -17,7 +17,7 @@ builds are produced and smoke-tested by CI, but nobody has used them day to day 
 | Real shell (node-pty), xterm.js 6 with WebGL, links, Unicode 11 | done |
 | Tabs, each with 1 to 4 tiled panes; per-pane opacity; framed or full-window view | done |
 | Talk to NYX from any pane: `nyx <message>` | done |
-| Six wireframe worlds, ships flying through, data packets zipping by | done |
+| Thirteen wireframe worlds, ships flying through, data packets zipping by | done |
 | Reactive soundtrack: kick, bass, acid line, distorted guitar chugs, pad; 84 to 162 BPM | done |
 | Modem dial-in on startup (DTMF, answer tone, handshake) | done |
 | NYX: canned personality, moods pick worlds, optional voice | done |
@@ -40,6 +40,15 @@ From the app itself, captured headless (`npm run shots`) in a made-up demo folde
 
 ![Full-window view, the ringed planet behind two panes](docs/screenshots/unframed.png)
 *Full window (`Ctrl+Shift+F`): no frame, the scene runs behind the panes.*
+
+![The Gibson mainframe: a ring of towers around a pulsing core](docs/screenshots/core.png)
+*GIBSON CORE: where NYX takes you for `ssh`, `sudo` and anything dangerous.*
+
+![A 90s BBS floating in space: who's online, the file area, the main menu](docs/screenshots/bbs.png)
+*BBS LOBBY: the board you dial into at boot.*
+
+![Black ICE: a lattice wall](docs/screenshots/ice.png)
+*ICE WALL: flares red on an error, cracks open when the next command works.*
 
 ![Space battle behind the terminal](docs/screenshots/battle.png)
 *DEEP SPACE: two fleets trading lasers, a capital ship sliding past.*
@@ -94,7 +103,7 @@ python3`). Optional: [Ollama](https://ollama.com) for NYX's local brain.
    ```
    Expected output:
    ```
-   > gibson@0.3.2 test
+   > gibson@0.4.0 test
    > node test/check.mjs
 
    check: all passed
@@ -144,6 +153,22 @@ named after its folder. `nyx` with a message talks to her directly: with a model
 remembers the last few exchanges; without one she still answers, briefly. The conversation shows
 over the bottom of the pane for 30 seconds.
 
+Worlds change with NYX's mood and with what you do:
+
+| World | When |
+|---|---|
+| BBS LOBBY | you log in |
+| FILESYSTEM | you `cd` (towers are the folder's real entries) |
+| GIT GALAXY | any `git` command (your repo's last 150 commits as spiral arms; new commits ignite) |
+| ICE WALL | an error (it cracks open when the next command works) |
+| GIBSON CORE | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
+| RAVE WAREHOUSE | a typing streak (speakers and the crowd move on the kick) |
+| DATASTREAM | a long build |
+| HIGHWAY | you go idle, or NYX is bored |
+| DEEP SEA, ORBIT, NEON CITY, DEEP SPACE, THE GRID | NYX's other moods |
+
+`Ctrl+Shift+W` steps through them and the right-click menu picks one.
+
 Opacity and the framed/full-window choice are remembered. The tempo follows your activity
 averaged over about 12 seconds (typing, and output scrolling past), so a burst barely moves it
 and a long session drives it up.
@@ -185,7 +210,8 @@ Headless screenshot (no window opens, so it works over RDP):
 npx electron . --shot out.png --world battle --panes 2 --unframed --at 8
 ```
 
-`--world` is one of `grid`, `city`, `files`, `battle`, `planet`, `tunnel`; `--tabs 3` opens three
+`--world` is one of `grid`, `city`, `files`, `battle`, `planet`, `tunnel`, `core`, `bbs`, `rave`,
+`git`, `ice`, `highway`, `sea`; `--tabs 3` opens three
 tabs and `--chat "are you real?"` types `nyx are you real?` into the first pane. Shot mode runs the
 shells in a made-up folder as `hacker@gibson`, so a capture never shows your machine.
 `npm run shots` regenerates everything in `docs/screenshots/`.

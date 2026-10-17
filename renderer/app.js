@@ -6,7 +6,8 @@
   const cfg = B.cfg;
   const $ = (id) => document.getElementById(id);
   const act = new Activity();
-  const worldEnv = { fs: null };
+  const worldEnv = { fs: null, git: null };
+  const refreshGit = (p) => window.gibson.gitLog(p.id).then((g) => { worldEnv.git = g; });
   const go = (w) => { if (!B.world) Worlds.go(w); };
   let music = null, pulse = 0, warp = 0;
 
@@ -118,6 +119,7 @@
     focused = p; p.tab.focused = p;
     for (const x of p.tab.panes) x.el.classList.toggle('focus', x === p);
     window.gibson.listDir(p.id).then((fs) => { worldEnv.fs = fs; Worlds.refreshFiles(); p.tab.cwdName = baseName(fs.cwd); label(p.tab); });
+    refreshGit(p);
   }
   // Growing adds panes; shrinking closes the newest ones, never the focused one.
   function setPanes(n) {
@@ -134,7 +136,7 @@
     const plain = d.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07/g, '');
     p.outTail = (p.outTail + plain).slice(-2000);
     if (!p.errorSeen && p.lastCmd && /(error|not recognized|command not found|fatal:|exception|failed|denied)/i.test(plain)) {
-      p.errorSeen = true; nyx.event('error', { cmd: p.lastCmd, output: p.outTail }, true);
+      p.errorSeen = true; Worlds.signal('error'); nyx.event('error', { cmd: p.lastCmd, output: p.outTail }, true);
     }
   });
 
@@ -143,8 +145,10 @@
     window.gibson.line(p.id, cmd);
     if (NYX_KIND(cmd) === 'cd') setTimeout(async () => {
       worldEnv.fs = await window.gibson.listDir(p.id); go('files'); Worlds.refreshFiles();
-      p.tab.cwdName = baseName(worldEnv.fs.cwd); label(p.tab);
+      p.tab.cwdName = baseName(worldEnv.fs.cwd); label(p.tab); refreshGit(p);
     }, 250);
+    if (/^git\b/i.test(cmd)) setTimeout(() => refreshGit(p), 1200); // new commits ignite in the galaxy
+    if (cmd) setTimeout(() => { if (!p.errorSeen && p.lastCmd === cmd) Worlds.signal('ok'); }, 1500);
     $('frame').style.setProperty('--warp', 1); warp = 1; // the Enter lunge
     nyx.command(cmd);
   }
@@ -192,7 +196,7 @@
 
   // --- worlds + fx ------------------------------------------------------------
   worldEnv.fs = await window.gibson.listDir(focused.id);
-  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs }));
+  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git }));
   if (B.world) Worlds.go(B.world);
   Fx.start({ logo: $('logo'), scroller: $('scroller'), rain: $('rain'), smoke: $('smoke') },
     () => ({ pulse, level: act.level(), smoking: act.busyOut > 4, scroll }));
@@ -250,7 +254,7 @@
     const fr = $('frame').style; fr.setProperty('--glow', pulse.toFixed(3)); fr.setProperty('--warp', warp.toFixed(3));
     $('status').textContent = `${Math.round(act.bpm)} BPM  ${'▮'.repeat(Math.round(lvl * 10)).padEnd(10, '▯')}\n${Worlds.label()}  //  ${B.user}@${B.host}`;
 
-    if (act.idle > 75 && !idleSaid) { idleSaid = true; nyx.event('idle', {}, true); go('grid'); }
+    if (act.idle > 75 && !idleSaid) { idleSaid = true; nyx.event('idle', {}, true); go('highway'); }
     if (act.idle < 1) idleSaid = false;
     if (act.busyOut > 4 && !compileSaid) { compileSaid = true; nyx.event('compile', { cmd: focused.lastCmd }, true); go('tunnel'); }
     if (compileSaid && act.busyOut === 0) { compileSaid = false; nyx.event('done', { cmd: focused.lastCmd, output: focused.outTail }, true); }

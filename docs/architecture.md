@@ -95,8 +95,27 @@ which is what lets the screenshot type a real `nyx` line through the keystroke p
 
 `renderer/worlds.js` is a single perspective projector and line batcher on a 2D canvas. Lines
 are batched by colour and alpha, drawn with additive blending over a partly cleared canvas, which
-gives the trails. Each world is `{ update, draw, enter? }`. A world change crossfades for about
-0.6 s with glitch slices.
+gives the trails. Each world is `{ label, update, draw, enter?, signal? }`. A world change
+crossfades for about 0.6 s with glitch slices.
+
+Which world shows: an event's own world if it has one (`EVENT_WORLD` in `nyx.js`: boot, git,
+error, danger, ssh, streak, compile), otherwise the world for NYX's mood (`MOOD_WORLD`). The
+self-check asserts every world those maps name exists.
+
+Two worlds read real data, passed in through `env` by `app.js`:
+
+- FILESYSTEM: `fs:list` for the focused pane's folder.
+- GIT GALAXY: `git:log` in `main.js` runs `git log --all --topo-order -n 150` in the focused
+  pane's folder (null if it is not a repository or git is missing; the world then draws a
+  made-up history). `gitLanes()` gives each commit a lane the way `git log --graph` does: a
+  commit takes the lane that was waiting for it, its first parent inherits the lane, other
+  parents get free lanes. Each lane is a spiral arm; radius and angle both grow with the square
+  root of a commit's age, which spaces commits evenly along the arm. The log is re-read on focus,
+  `cd`, and 1.2 s after any `git` command, and commits not seen before ignite.
+
+`Worlds.signal(kind)` passes events to any world with a `signal` handler. `app.js` sends
+`error` when a command's output looks like an error and `ok` 1.5 s after a command that did not;
+ICE WALL flares on the first and cracks open on the second.
 
 ## Headless screenshots
 

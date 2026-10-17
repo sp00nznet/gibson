@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const pty = require('node-pty');
+const { execFile } = require('child_process');
 const { llmLine } = require('./llm');
 
 // One config folder for source runs and packaged builds (whose app name is GIBSON).
@@ -101,6 +102,18 @@ function trackCd(pane, line) {
   const target = m[1].replace(/^\/d\s+/i, '').replace(/^["']|["']$/g, '').replace(/^~/, os.homedir());
   const next = path.resolve(pane.cwd, target);
   try { if (fs.statSync(next).isDirectory()) pane.cwd = next; } catch { /* bad cd, shell will say so */ }
+}
+
+// The GIT GALAXY world: the last 150 commits on every branch, newest first. null when the
+// folder is not a repository or git is not installed; the world then shows a made-up history.
+function gitLog(dir) {
+  return new Promise((resolve) => {
+    execFile('git', ['log', '--all', '--topo-order', '-n', '150', '--format=%h%x1f%p%x1f%s%x1f%D'], { cwd: dir, timeout: 4000, windowsHide: true }, (err, out) => {
+      if (err || !out) return resolve(null);
+      const commits = out.trim().split('\n').map((l) => { const [h, p, s, refs] = l.split('\x1f'); return { h, p: p ? p.split(' ') : [], s: s || '', refs: refs || '' }; });
+      resolve({ cwd: SHOT ? 'C:\\GIBSON' : dir, commits });
+    });
+  });
 }
 
 function listDir(dir) {
@@ -200,6 +213,7 @@ app.whenReady().then(() => {
     cfg[key] = v;
     try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u[key] = v; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* config unreadable: keep it for this session */ }
   });
+  ipcMain.handle('git:log', (_e, id) => gitLog((panes.get(id) || { cwd: home }).cwd));
   ipcMain.on('menu', (_e, st) => contextMenu(st).popup({ window: win }));
   ipcMain.handle('nyx:llm', (_e, event) => llmLine(cfg.llm, event).catch(() => null));
   ipcMain.on('win:fullscreen', () => win.setFullScreen(!win.isFullScreen()));

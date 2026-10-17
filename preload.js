@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('gibson', {
   line: (id, l) => ipcRenderer.send('pty:line', id, l),
   onData: (fn) => ipcRenderer.on('pty:data', (_e, id, d) => fn(id, d)),
   listDir: (id) => ipcRenderer.invoke('fs:list', id),
+  gitLog: (id) => ipcRenderer.invoke('git:log', id),
   onHotkey: (fn) => ipcRenderer.on('hotkey', (_e, a) => fn(a)),
   menu: (state) => ipcRenderer.send('menu', state),
   save: (key, v) => ipcRenderer.send('cfg:save', key, v),

@@ -295,8 +295,307 @@
     };
   })();
 
+  const ring = (x, y, z, r, n, col, a, fog, plane) => { // plane 'xz' (flat) or 'xy' (facing the camera)
+    for (let i = 0; i < n; i++) {
+      const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2;
+      if (plane === 'xy') seg(x + Math.cos(a0) * r, y + Math.sin(a0) * r, z, x + Math.cos(a1) * r, y + Math.sin(a1) * r, z, col, a, fog);
+      else seg(x + Math.cos(a0) * r, y, z + Math.sin(a0) * r, x + Math.cos(a1) * r, y, z + Math.sin(a1) * r, col, a, fog);
+    }
+  };
+
+  // The mainframe from the film: a ring of towers around a pulsing core, data climbing the columns.
+  worlds.core = (() => {
+    const N = 14, R = 34, towers = Array.from({ length: N }, (_, i) => ({ a: i / N * Math.PI * 2, h: rand(34, 58) }));
+    let climb = [];
+    return {
+      label: 'GIBSON CORE',
+      update(dt) {
+        if (Math.random() < dt * (6 + env.level * 30)) climb.push({ t: pick(towers), y: 0, v: rand(12, 34), col: pick([C.gold, C.hot, C.neon]) });
+        for (const c of climb) c.y += c.v * dt;
+        climb = climb.filter((c) => c.y < c.t.h);
+      },
+      draw() {
+        const a = env.t * 0.08;
+        setCam(lookAt({ x: Math.sin(a) * 66, y: 16 + Math.sin(env.t * 0.1) * 6, z: Math.cos(a) * 66 }, 0, 22, 0));
+        for (let r = 8; r <= 48; r += 8) ring(0, 0, 0, r, 48, C.violet, 0.35, 220);
+        for (let i = 0; i < 24; i++) { const s = i / 24 * Math.PI * 2; seg(Math.cos(s) * 8, 0, Math.sin(s) * 8, Math.cos(s) * 48, 0, Math.sin(s) * 48, C.violet, 0.2, 220); }
+        towers.forEach((t, i) => {
+          const x = Math.cos(t.a) * R, z = Math.sin(t.a) * R;
+          box(x, 0, z, 5, t.h, 5, C.ice, 0.9, 200);
+          for (let y = 3; y < t.h; y += 3) {
+            seg(x - 2.5, y, z - 2.5, x + 2.5, y, z - 2.5, C.ice, 0.18, 200); seg(x - 2.5, y, z + 2.5, x + 2.5, y, z + 2.5, C.ice, 0.18, 200);
+            if (Math.sin(i * 13.7 + y * 3.1 + env.t * 3) > 0.75) seg(x - 1.5, y + 1, z - 2.6, x + 1.5, y + 1, z - 2.6, C.gold, 1, 200);
+          }
+          if (Math.sin(env.t * 2 + i * 1.9) > 0.92) seg(0, 52, 0, x, t.h, z, C.hot, 0.7, 200); // the core talking to a tower
+        });
+        const spin = env.t * 0.6, glow = 0.5 + env.pulse * 0.5;
+        for (let i = 0; i < 16; i++) { const s = i / 16 * Math.PI * 2 + spin; seg(Math.cos(s) * 4, 0, Math.sin(s) * 4, Math.cos(s) * 4, 52, Math.sin(s) * 4, C.hot, glow, 200); }
+        for (let y = 0; y <= 52; y += 4) ring(0, y, 0, 4 + env.pulse * 0.8, 16, C.hot, glow, 200);
+        for (let k = 0; k < 60; k++) { const s0 = k * 0.35 + spin * 2, s1 = (k + 1) * 0.35 + spin * 2; seg(Math.cos(s0) * 2, k * 0.85, Math.sin(s0) * 2, Math.cos(s1) * 2, (k + 1) * 0.85, Math.sin(s1) * 2, C.gold, 0.8, 200); }
+        for (const c of climb) { const x = Math.cos(c.t.a) * (R - 2.6), z = Math.sin(c.t.a) * (R - 2.6); seg(x, c.y, z, x, c.y + 3, z, c.col, 1, 200); }
+      },
+    };
+  })();
+
+  // A 90s board floating in space: main menu, who's online, the file area, a download crawling along.
+  worlds.bbs = (() => {
+    const HANDLES = ['ZERO COOL', 'ACID BURN', 'CEREAL KILLER', 'LORD NIKON', 'PHANTOM PHREAK', 'THE PLAGUE', 'RAZOR', 'BLADE', 'CRASH OVERRIDE'];
+    const panels = [
+      { x: -13, y: 9, z: 40, w: 26, h: 15, col: C.neon, title: 'THE GIBSON BBS :: NODE 1 :: 14400 BAUD',
+        lines: ['[M] MESSAGE BASES      (42 NEW)', '[F] FILE AREAS         0DAY / WAREZ', '[D] DOORS: L.O.R.D.  TRADEWARS 2002', '[W] WHO IS ONLINE', '[C] CHAT WITH SYSOP    (NYX IS IN)', '[G] GOODBYE / LOGOFF'], menu: true },
+      { x: -70, y: 16, z: 72, w: 23, h: 21, col: C.ice, title: 'WHO IS ONLINE', lines: HANDLES.map((h, i) => `${String(i + 1).padStart(2)} ${h.padEnd(15)} ${pick(['2400', '9600', '14400', '28800', '33600'])}`) },
+      { x: 47, y: 16, z: 72, w: 23, h: 16, col: C.gold, title: 'FILE AREA 7: 0DAY',
+        lines: ['GARBAGE.DAT      48K  ****', 'DAVINCI.ZIP     1.4M  *****', 'WORM.EXE         22K  ***', 'PHRACK47.TXT     96K  *****', 'ACIDBURN.NFO      3K  **', 'RATIO 1:3 // UL MORE, LEECH'] },
+    ];
+    let sel = 0, selT = 0, dl = 0, chat = 0;
+    const tick = '  ::  SYSOP: NYX  ::  NO LAMERS  ::  CALL BACK AFTER 11PM  ::  GREETZ TO EVERYONE AT THE 2600 MEETING  ';
+    return {
+      label: 'BBS LOBBY',
+      update(dt) {
+        selT += dt; if (selT > 1.4) { selT = 0; sel = (sel + 1) % panels[0].lines.length; }
+        dl = (dl + dt * (0.05 + env.level * 0.2)) % 1.15; chat += dt * 6;
+      },
+      draw() {
+        setCam({ x: Math.sin(env.t * 0.15) * 6, y: 4 + Math.sin(env.t * 0.1) * 2, z: -4 + Math.sin(env.t * 0.07) * 4, yaw: Math.sin(env.t * 0.15) * -0.07, pitch: 0.03 });
+        for (let x = -80; x <= 80; x += 8) seg(x, -14, 10, x, -14, 150, C.violet, 0.25, 160);
+        for (let z = 10; z <= 150; z += 8) seg(-80, -14, z, 80, -14, z, C.violet, 0.25, 160);
+        for (const p of panels) {
+          const fr = (o) => { seg(p.x - o, p.y + o, p.z, p.x + p.w + o, p.y + o, p.z, p.col, 0.9, 200); seg(p.x + p.w + o, p.y + o, p.z, p.x + p.w + o, p.y - p.h - o, p.z, p.col, 0.9, 200); seg(p.x + p.w + o, p.y - p.h - o, p.z, p.x - o, p.y - p.h - o, p.z, p.col, 0.9, 200); seg(p.x - o, p.y - p.h - o, p.z, p.x - o, p.y + o, p.z, p.col, 0.9, 200); };
+          fr(0); fr(0.5);
+          seg(p.x, p.y - 2.2, p.z, p.x + p.w, p.y - 2.2, p.z, p.col, 0.6, 200);
+          text3(p.title, p.x + 0.8, p.y - 1.5, p.z, C.white, 1.0);
+          p.lines.forEach((l, i) => {
+            const y = p.y - 4 - i * 1.8;
+            if (p.menu && i === sel) { seg(p.x + 0.4, y + 1.2, p.z, p.x + p.w - 0.4, y + 1.2, p.z, C.hot, 0.8, 200); seg(p.x + 0.4, y - 0.5, p.z, p.x + p.w - 0.4, y - 0.5, p.z, C.hot, 0.8, 200); }
+            text3(l, p.x + 1, y, p.z, p.menu && i === sel ? C.hot : p.col, 0.95);
+          });
+        }
+        const m = panels[0], ty = m.y - m.h + 1;
+        const k = Math.floor(chat) % tick.length; text3((tick + tick).slice(k, k + 38), m.x + 1, ty, m.z, C.violet, 0.9);
+        // the download that never quite finishes
+        const bx = -14, by = -8, bz = 48, bw = 28, f = Math.min(1, dl);
+        seg(bx, by, bz, bx + bw, by, bz, C.neon, 0.9); seg(bx, by - 1.6, bz, bx + bw, by - 1.6, bz, C.neon, 0.9);
+        seg(bx, by, bz, bx, by - 1.6, bz, C.neon, 0.9); seg(bx + bw, by, bz, bx + bw, by - 1.6, bz, C.neon, 0.9);
+        for (let x = bx + 0.4; x < bx + bw * f; x += 0.6) seg(x, by - 0.3, bz, x, by - 1.3, bz, C.neon, 0.8);
+        text3(`ZMODEM  GARBAGE.DAT  ${Math.round(f * 100)}%  ${(1.2 + env.level * 2.4).toFixed(1)} KB/s  CPS`, bx, by + 1.2, bz, C.neon, 0.9);
+      },
+    };
+  })();
+
+  // A warehouse party: trusses, speaker stacks pumping on the kick, laser fans, a crowd bouncing.
+  worlds.rave = (() => {
+    const crowd = Array.from({ length: 80 }, () => ({ x: rand(-22, 22), z: rand(6, 32), h: rand(1.5, 2.1), ph: rand(0, 6) }));
+    const emit = Array.from({ length: 7 }, (_, i) => ({ x: -18 + i * 6, ph: i * 0.9, col: [C.neon, C.hot, C.ice, C.gold, C.violet, C.hot, C.neon][i] }));
+    return {
+      label: 'RAVE WAREHOUSE',
+      update() {},
+      draw() {
+        const kick = env.pulse, Wd = 26, D = 56, Hh = 16;
+        setCam(lookAt({ x: Math.sin(env.t * 0.2) * 5, y: 5 + kick * 0.4, z: -8 }, 0, 5, 34));
+        for (let z = 0; z <= D; z += 7) {
+          seg(-Wd, 0, z, -Wd, Hh, z, C.violet, 0.35, 200); seg(Wd, 0, z, Wd, Hh, z, C.violet, 0.35, 200);
+          seg(-Wd, Hh, z, 0, Hh + 5, z, C.violet, 0.35, 200); seg(0, Hh + 5, z, Wd, Hh, z, C.violet, 0.35, 200);
+          seg(-Wd, Hh, z, Wd, Hh, z, C.violet, 0.2, 200);
+        }
+        for (const x of [-Wd, Wd]) for (const y of [0, Hh]) seg(x, y, 0, x, y, D, C.violet, 0.35, 200);
+        seg(0, Hh + 5, 0, 0, Hh + 5, D, C.violet, 0.35, 200);
+        for (let x = -Wd; x <= Wd; x += 4) seg(x, 0, 0, x, 0, D, C.violet, 0.15, 200);
+        box(0, 0, 44, 22, 1.5, 7, C.neon, 0.8, 200); box(0, 1.5, 43, 6, 1.6, 2, C.ice, 0.9, 200);
+        for (const sx of [-15, 15]) for (let k = 0; k < 3; k++) {
+          const y = 1.5 + k * 3.2; box(sx, y, 44, 4, 3, 3, C.ice, 0.9, 200);
+          ring(sx, y + 1.5, 42.4, 1 + kick * 0.45, 14, kick > 0.6 ? C.hot : C.ice, 0.9, 200, 'xy');
+        }
+        for (const e of emit) for (let k = 0; k < 6; k++) {
+          const ex = e.x + Math.sin(env.t * 1.1 + e.ph + k * 0.45) * 15, ez = 6 + k * 4.5 + Math.sin(env.t * 0.7 + k) * 3;
+          seg(e.x, Hh - 0.5, 44, ex, 0, ez, e.col, 0.35 + kick * 0.55, 200);
+        }
+        for (const c of crowd) {
+          const j = kick * 0.7 * (0.6 + 0.4 * Math.sin(c.ph + env.t)), sway = Math.sin(env.t * 2 + c.ph) * 0.15;
+          seg(c.x, j, c.z, c.x + sway, c.h + j, c.z, C.white, 0.55, 200);
+          seg(c.x + sway - 0.25, c.h + j + 0.3, c.z, c.x + sway + 0.25, c.h + j + 0.3, c.z, C.white, 0.55, 200);
+          if (kick > 0.7 && Math.sin(c.ph * 7) > 0.6) seg(c.x + sway, c.h + j, c.z, c.x + sway + 0.4, c.h + j + 0.9, c.z, C.white, 0.5, 200); // hands up
+        }
+      },
+    };
+  })();
+
+  // Your repository's history as a galaxy: one spiral arm per branch lane, the newest commits
+  // on the rim. A commit that appears while you watch ignites. Not a repo: a made-up history.
+  function gitLanes(commits) { // newest first, as git log prints them
+    const lanes = [];
+    return commits.map((c) => {
+      let l = lanes.indexOf(c.h);
+      if (l < 0) { l = lanes.indexOf(null); if (l < 0) l = lanes.length; }
+      for (let i = 0; i < lanes.length; i++) if (lanes[i] === c.h) lanes[i] = null;
+      lanes[l] = c.p[0] || null;
+      for (const par of c.p.slice(1)) if (!lanes.includes(par)) { const f = lanes.indexOf(null); if (f < 0) lanes.push(par); else lanes[f] = par; }
+      return { ...c, lane: l };
+    });
+  }
+  function fakeHistory() {
+    const msgs = ['hack the planet', 'remove the garbage file', 'fix the worm', 'da vinci virus: contain', 'mess with the best', 'crash override', 'add acid burn', 'it is in that place where I put that thing that time'];
+    const out = []; let main = 'f0', feat = null;
+    for (let i = 0; i < 90; i++) {
+      const h = (1000 + i).toString(16);
+      if (i % 17 === 5) feat = main;
+      if (feat && i % 3 === 0) { out.push({ h, p: [feat], s: pick(msgs), refs: '' }); feat = h; if (i % 17 === 14) { const m = (5000 + i).toString(16); out.push({ h: m, p: [main, feat], s: 'merge', refs: '' }); main = m; feat = null; } }
+      else { out.push({ h, p: [main], s: pick(msgs), refs: '' }); main = h; }
+    }
+    out.reverse(); out[0].refs = 'HEAD -> main, origin/main';
+    return out;
+  }
+  worlds.git = (() => {
+    let stars = [], builtFrom, seen = new Set(), born = new Map(), label = '';
+    function build(gitData) {
+      builtFrom = gitData;
+      const real = gitData && gitData.commits && gitData.commits.length;
+      const list = gitLanes(real ? gitData.commits : fakeHistory());
+      label = real ? `${gitData.cwd} :: ${list.length} COMMITS` : 'NO REPOSITORY HERE :: SIMULATED HISTORY';
+      const n = list.length, by = new Map();
+      stars = list.map((c, i) => {
+        // r and angle both grow with sqrt(age): commits sit evenly spaced along each arm
+        const age = n - 1 - i, r = 5 + Math.sqrt(age / Math.max(1, n)) * 72, ang = Math.sqrt(age) * 0.9 + c.lane * 1.4;
+        const s = { ...c, r, ang, y: Math.sin(age * 0.3 + c.lane) * 0.8 + c.lane * 0.6 };
+        by.set(c.h, s); return s;
+      });
+      for (const s of stars) s.parents = s.p.map((h) => by.get(h)).filter(Boolean);
+      const now = env.t;
+      for (const s of stars) if (seen.size && !seen.has(s.h)) born.set(s.h, now);
+      seen = new Set(stars.map((s) => s.h));
+    }
+    const pos = (s, spin) => [Math.cos(s.ang + spin) * s.r, s.y, Math.sin(s.ang + spin) * s.r];
+    return {
+      label: 'GIT GALAXY',
+      enter() { build(env.git); },
+      update() { if (env.git !== builtFrom) build(env.git); },
+      draw() {
+        const spin = env.t * 0.04, a = env.t * 0.05;
+        setCam(lookAt({ x: Math.sin(a) * 58, y: 30 + Math.sin(env.t * 0.11) * 6, z: Math.cos(a) * 58 }, 0, 0, 0));
+        ring(0, 0, 0, 2.5 + env.pulse, 20, C.gold, 0.9, 200);
+        for (const s of stars) {
+          const [x, y, z] = pos(s, spin), col = [C.ice, C.hot, C.neon, C.gold, C.violet][s.lane % 5];
+          for (const p of s.parents) { const q = pos(p, spin); seg(x, y, z, q[0], q[1], q[2], col, 0.85, 200); }
+          const sz = 0.6 + (s.parents.length > 1 ? 0.4 : 0);
+          seg(x - sz, y, z, x + sz, y, z, C.white, 0.9, 200); seg(x, y - sz, z, x, y + sz, z, C.white, 0.9, 200);
+          const b = born.get(s.h);
+          if (b != null && env.t - b < 4) { const k = (env.t - b) / 4; ring(x, y, z, 0.5 + k * 6, 16, C.gold, 1 - k, 200); }
+          if (s.refs) text3(s.refs.replace('HEAD -> ', '> ').slice(0, 30), x + 0.8, y + 0.8, z, C.gold, 1.2);
+        }
+        const head = stars[0];
+        if (head) { const [x, y, z] = pos(head, spin); ring(x, y, z, 1 + env.pulse * 0.8, 14, C.hot, 1, 200); text3(head.s.slice(0, 40), x + 0.8, y - 1.4, z, C.white, 0.9, 0.8); }
+        g.fillStyle = `rgba(${C.neon},0.75)`; g.font = "14px 'Cascadia Mono', Consolas, monospace"; g.fillText(label, 24, H - 28);
+      },
+    };
+  })();
+
+  // Black ICE: a lattice wall that cracks open when a command works and flares red when one fails.
+  worlds.ice = (() => {
+    let open = 0, alarm = 0, rot = 0;
+    const cells = []; for (let i = -15; i <= 15; i++) for (let j = -9; j <= 9; j++) cells.push([i * 4 + (j & 1) * 2, j * 3.4]);
+    return {
+      label: 'ICE WALL',
+      signal(k) { if (k === 'ok') open = 1; if (k === 'error') alarm = 1; },
+      update(dt) { open = Math.max(0, open - dt * 0.45); alarm = Math.max(0, alarm - dt * 0.7); rot += dt * (0.04 + env.level * 0.15); },
+      draw() {
+        setCam({ x: Math.sin(env.t * 0.1) * 3, y: Math.sin(env.t * 0.13) * 2, z: 0, yaw: Math.sin(env.t * 0.1) * -0.05, pitch: 0 });
+        const gap = Math.sin(Math.PI * Math.min(1, (1 - open) * 1.2)) * (open > 0 ? 9 : 0);
+        for (const [layer, z, col, al, dir] of [[0, 46, alarm > 0 ? C.hot : C.ice, 0.9, 1], [1, 58, C.violet, 0.45, -1]]) {
+          const c2 = Math.cos(rot * dir), s2 = Math.sin(rot * dir);
+          for (const [cx0, cy0] of cells) {
+            let cx = cx0 * c2 - cy0 * s2, cyy = cx0 * s2 + cy0 * c2;
+            const d = Math.hypot(cx, cyy) || 1, push = layer ? gap * 0.4 : gap * Math.exp(-d / 18);
+            cx += cx / d * push; cyy += cyy / d * push;
+            if (alarm > 0) { cx += rand(-1, 1) * alarm * 1.5; }
+            const zz = z - (layer ? 0 : push * 0.6);
+            seg(cx, cyy + 1.6, zz, cx + 1.9, cyy, zz, col, al, 200); seg(cx + 1.9, cyy, zz, cx, cyy - 1.6, zz, col, al, 200);
+            seg(cx, cyy - 1.6, zz, cx - 1.9, cyy, zz, col, al, 200); seg(cx - 1.9, cyy, zz, cx, cyy + 1.6, zz, col, al, 200);
+          }
+        }
+        const sy2 = Math.sin(env.t * 0.8) * 22; seg(-45, sy2, 45, 45, sy2, 45, alarm > 0 ? C.hot : C.neon, 0.5, 200);
+        if (alarm > 0) text3('ACCESS DENIED', -8, -1, 40, C.hot, 2.2, alarm);
+        else if (open > 0) text3('ACCESS GRANTED', -9, -1, 40, C.neon, 2.2, open);
+        else text3('BLACK ICE // SECURITY LEVEL 7', -11, -26, 46, C.ice, 1.2, 0.5);
+      },
+    };
+  })();
+
+  // Night drive: road lines and streetlights streaming at you, taillights ahead, the skyline far off.
+  worlds.highway = (() => {
+    let off = 0;
+    const cars = Array.from({ length: 9 }, () => ({ x: pick([-4.6, -1.5, 1.5, 4.6]), z: rand(20, 140), v: rand(-6, 6) }));
+    const sky = Array.from({ length: 70 }, (_, i) => ({ x: -175 + i * 5, h: rand(5, 34) }));
+    const bend = (z) => z * z * 0.0009 * Math.sin(env.t * 0.12);
+    return {
+      label: 'HIGHWAY',
+      update(dt) { off += (14 + env.speed * 0.7) * dt; for (const c of cars) { c.z += c.v * dt; if (c.z < 12) c.z = 140; if (c.z > 145) c.z = 20; } },
+      draw() {
+        setCam({ x: Math.sin(env.t * 0.2) * 0.6, y: 1.7, z: 0, yaw: Math.sin(env.t * 0.07) * 0.03, pitch: -0.015 });
+        const L = (x, y, z, x2, y2, z2, col, a) => seg(x + bend(z), y, z, x2 + bend(z2), y2, z2, col, a, 160);
+        for (let z = 1; z < 150; z += 6) { L(-7, 0, z, -7, 0, z + 6, C.hot, 0.9); L(7, 0, z, 7, 0, z + 6, C.hot, 0.9); }
+        for (let z = 4 - (off % 8); z < 150; z += 8) for (const x of [-3.1, 0, 3.1]) L(x, 0, z, x, 0, z + 3, x ? C.white : C.gold, 0.8);
+        for (let z = 20 - (off % 20); z < 150; z += 20) for (const s of [-1, 1]) {
+          const x = s * 9.5; L(x, 0, z, x, 7, z, C.violet, 0.7); L(x, 7, z, x - s * 2.2, 7.3, z, C.violet, 0.7);
+          L(x - s * 2.2, 7.2, z, x - s * 2.2, 6.6, z, C.gold, 1);
+        }
+        for (const c of cars) {
+          const col = c.x > 0 ? C.hot : C.gold; // ours go away (taillights), theirs come at us (headlights)
+          L(c.x - 0.7, 0.6, c.z, c.x - 0.3, 0.6, c.z, col, 1); L(c.x + 0.3, 0.6, c.z, c.x + 0.7, 0.6, c.z, col, 1);
+        }
+        for (let i = 0; i < sky.length - 1; i++) {
+          const a = sky[i], b = sky[i + 1];
+          seg(a.x, a.h, 148, b.x, a.h, 148, C.ice, 0.6, 400); seg(b.x, a.h, 148, b.x, b.h, 148, C.ice, 0.6, 400);
+        }
+        seg(-200, 0, 148, 200, 0, 148, C.hot, 0.6, 400);
+      },
+    };
+  })();
+
+  // Sunken server racks, cables swaying like kelp, data fish schooling, bubbles rising.
+  worlds.sea = (() => {
+    const racks = Array.from({ length: 14 }, () => ({ x: rand(-40, 40), z: rand(22, 110), h: rand(6, 14) }));
+    const kelp = Array.from({ length: 32 }, () => ({ x: rand(-55, 55), z: rand(14, 120), h: rand(10, 30), ph: rand(0, 6), col: pick([C.neon, C.violet, C.ice]) }));
+    const fish = Array.from({ length: 48 }, (_, i) => ({ g: i % 4, o: [rand(-5, 5), rand(-2, 2), rand(-5, 5)], ph: rand(0, 6) }));
+    let bubbles = [];
+    const school = (gi, t) => [Math.sin(t * 0.2 + gi * 1.7) * 46, 9 + Math.sin(t * 0.31 + gi * 2) * 4, 55 + Math.cos(t * 0.17 + gi) * 28];
+    return {
+      label: 'DEEP SEA',
+      update(dt) {
+        if (Math.random() < dt * 8) { const r = pick(racks); bubbles.push({ x: r.x + rand(-1, 1), y: r.h, z: r.z, v: rand(2, 5) }); }
+        for (const b of bubbles) { b.y += b.v * dt; b.x += Math.sin(env.t * 3 + b.z) * dt * 0.5; }
+        bubbles = bubbles.filter((b) => b.y < 40);
+      },
+      draw() {
+        setCam({ x: Math.sin(env.t * 0.08) * 6, y: 10 + Math.sin(env.t * 0.17) * 1.5, z: 0, yaw: Math.sin(env.t * 0.06) * 0.1, pitch: -0.12 });
+        const bed = (x, z) => Math.sin(x * 0.2 + z * 0.1) * 0.8;
+        for (let x = -60; x <= 60; x += 6) for (let z = 10; z < 130; z += 6) {
+          seg(x, bed(x, z), z, x, bed(x, z + 6), z + 6, C.ice, 0.22, 110); seg(x, bed(x, z), z, x + 6, bed(x + 6, z), z, C.ice, 0.22, 110);
+        }
+        racks.forEach((r, i) => {
+          box(r.x, 0, r.z, 3, r.h, 2.5, C.ice, 0.8, 110);
+          for (let y = 1; y < r.h; y += 1.2) {
+            seg(r.x - 1.5, y, r.z - 1.25, r.x + 1.5, y, r.z - 1.25, C.ice, 0.25, 110);
+            if (Math.sin(i * 7.3 + y * 5 + env.t * 4) > 0.6) seg(r.x + 0.8, y + 0.5, r.z - 1.3, r.x + 1.2, y + 0.5, r.z - 1.3, pick([C.hot, C.neon]), 1, 110);
+          }
+        });
+        for (const k of kelp) {
+          let px = k.x, py = 0;
+          for (let s = 1; s <= 10; s++) { const y = s * k.h / 10, x = k.x + Math.sin(env.t * 0.8 + k.ph + s * 0.4) * s * 0.3; seg(px, py, k.z, x, y, k.z, k.col, 0.7, 110); px = x; py = y; }
+        }
+        for (const f of fish) {
+          const c = school(f.g, env.t), n = school(f.g, env.t + 0.1), hx = n[0] - c[0], hz = n[2] - c[2], hl = Math.hypot(hx, hz) || 1;
+          const x = c[0] + f.o[0] + Math.sin(env.t * 2 + f.ph) * 0.4, y = c[1] + f.o[1], z = c[2] + f.o[2];
+          const dx = hx / hl, dz = hz / hl, wag = Math.sin(env.t * 9 + f.ph) * 0.2;
+          seg(x, y, z, x - dx * 2 - dz * (0.8 + wag), y, z - dz * 2 + dx * (0.8 + wag), C.gold, 0.9, 110);
+          seg(x, y, z, x - dx * 2 + dz * (0.8 - wag), y, z - dz * 2 - dx * (0.8 - wag), C.gold, 0.9, 110);
+        }
+        for (const b of bubbles) seg(b.x, b.y, b.z, b.x, b.y + 0.4, b.z, C.white, 0.7, 110);
+        for (let i = 0; i < 6; i++) { const x = -40 + i * 16 + Math.sin(env.t * 0.2 + i) * 4; seg(x, 40, 60, x + 8, 0, 80, C.white, 0.08, 200); }
+      },
+    };
+  })();
+
   // --- engine ----------------------------------------------------------------
-  const env = { t: 0, speed: 10, level: 0, pulse: 0, warp: 0, bright: 1, fs: null };
+  const env = { t: 0, speed: 10, level: 0, pulse: 0, warp: 0, bright: 1, fs: null, git: null };
   let cur = 'grid', prev = null, trans = 1, last = 0, source = () => ({});
 
   function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; F = H * 0.9; }
@@ -328,6 +627,9 @@
       if (!worlds[name] || name === cur) return;
       prev = cur; cur = name; trans = 0; if (worlds[cur].enter) worlds[cur].enter();
     },
+    // Events the current world may react to: 'ok' (a command worked), 'error', 'commit'.
+    signal(kind) { for (const w of Object.values(worlds)) if (w.signal) w.signal(kind); },
+    gitLanes, // exported for the self-check
     refreshFiles() { if (worlds.files.refresh && cur === 'files') worlds.files.refresh(); },
     start(canvas, src) { cv = canvas; g = cv.getContext('2d'); source = src; resize(); addEventListener('resize', resize); requestAnimationFrame(frame); },
   };

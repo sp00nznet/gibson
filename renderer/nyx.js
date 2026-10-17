@@ -3,7 +3,9 @@
 // below are the whole personality when no LLM is configured; with one, the model
 // writes the line and these are the fallback.
 (function (root) {
-  const MOOD_WORLD = { welcoming: 'planet', tender: 'planet', curious: 'files', playful: 'battle', taunting: 'battle', impressed: 'city', bored: 'grid', intense: 'tunnel' };
+  const MOOD_WORLD = { welcoming: 'grid', tender: 'sea', curious: 'files', playful: 'planet', taunting: 'battle', impressed: 'city', bored: 'highway', intense: 'core' };
+  // Some events have a world of their own, whatever her mood.
+  const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: 'core', ssh: 'core', streak: 'rave', compile: 'tunnel' };
 
   const LINES = {
     boot: [
@@ -84,7 +86,7 @@
     if (!line) line = this.canned(kind);
     if (!line.mood) line.mood = this.canned(kind).mood;
     this.mood = line.mood;
-    this.ctx.say(line.text, line.mood, MOOD_WORLD[line.mood]);
+    this.ctx.say(line.text, line.mood, EVENT_WORLD[kind] || MOOD_WORLD[line.mood]);
   };
   // `nyx <message>` in a terminal: always answers, no chatter roll, no LLM rate limit.
   Nyx.prototype.chat = async function (message) {
@@ -107,5 +109,5 @@
     this.event(kind, { cmd }, kind === 'danger' || kind === 'cd');
   };
 
-  root.Nyx = Nyx; root.NYX_KIND = kindOf; root.MOOD_WORLD = MOOD_WORLD;
+  root.Nyx = Nyx; root.NYX_KIND = kindOf; root.MOOD_WORLD = MOOD_WORLD; root.EVENT_WORLD = EVENT_WORLD;
 })(this);
