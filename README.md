@@ -242,7 +242,8 @@ remembered for you; everything else you edit by hand
 ```
 
 - **Shells.** GIBSON finds the installed ones (Windows: PowerShell, PowerShell 7, Command Prompt,
-  WSL, Git Bash; elsewhere: everything in `/etc/shells`). Pick the default with right-click >
+  Git Bash, and each WSL distro by name, Docker Desktop's skipped; elsewhere: `$SHELL` and
+  everything in `/etc/shells`, as login shells on macOS). Pick the default with right-click >
   Tabs > Default shell (saved as `defaultShell`), or open a tab in any of them from the `▾`
   button. `profiles` adds your own (`name`, `shell`, `args`, optional starting `cwd`); one with the
   same name as a found shell replaces it. The old `shell` / `shellArgs` settings still work as the

@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const pty = require('node-pty');
-const { execFile } = require('child_process');
+const { execFile, execFileSync } = require('child_process');
 const { llmLine } = require('./llm');
 const sys = require('./sysinfo');
 
@@ -135,16 +135,15 @@ function detectShells() {
     const pwsh = onPath('pwsh.exe') ? 'pwsh.exe' : path.join(pf, 'PowerShell', '7', 'pwsh.exe');
     if (pwsh === 'pwsh.exe' || exists(pwsh)) out.push({ name: 'PowerShell 7', shell: pwsh, args: ['-NoLogo'] });
     out.push({ name: 'Command Prompt', shell: 'cmd.exe', args: [] });
-    if (onPath('wsl.exe')) out.push({ name: 'WSL', shell: 'wsl.exe', args: [] });
+    if (onPath('wsl.exe')) {
+      try { out.push(...sys.wslDistros(execFileSync('wsl.exe', ['-l', '-q'], { timeout: 4000, windowsHide: true }).toString('utf16le'))); }
+      catch { out.push({ name: 'WSL', shell: 'wsl.exe', args: [] }); } // no list: the default distro
+    }
     const gitBash = path.join(pf, 'Git', 'bin', 'bash.exe');
     if (exists(gitBash)) out.push({ name: 'Git Bash', shell: gitBash, args: ['--login', '-i'] });
   } else {
-    let list = []; try { list = fs.readFileSync('/etc/shells', 'utf8').split('\n').filter((l) => l.startsWith('/')); } catch { /* no list */ }
-    const seen = new Set();
-    for (const s of [process.env.SHELL || '/bin/bash', ...list]) {
-      const name = path.basename(s); if (seen.has(name) || !exists(s)) continue;
-      seen.add(name); out.push({ name, shell: s, args: [] });
-    }
+    let list = ''; try { list = fs.readFileSync('/etc/shells', 'utf8'); } catch { /* no list */ }
+    out.push(...sys.unixShells(list, process.env.SHELL, process.platform === 'darwin', exists));
   }
   return out;
 }

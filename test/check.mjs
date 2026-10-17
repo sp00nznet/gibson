@@ -24,6 +24,15 @@ assert.deepEqual(sysinfo.parseFeed(rss).map((i) => [i.title, i.source]), [['Worm
 const atom = '<feed><title>Reg</title><entry><title type="html">Patch &#8217;em</title><link href="https://y/2"/></entry></feed>';
 assert.deepEqual(sysinfo.parseFeed(atom)[0], { title: 'Patch \u2019em', link: 'https://y/2', source: 'Reg' }, 'Atom');
 
+// --- shell profiles ---
+const wsl = sysinfo.wslDistros(Buffer.from('Debian\r\nUbuntu\r\ndocker-desktop\r\n', 'utf16le').toString('utf16le'));
+assert.deepEqual(wsl.map((p) => [p.name, p.args.join(' ')]), [['Debian (WSL)', '-d Debian'], ['Ubuntu (WSL)', '-d Ubuntu']], 'one profile per distro, Docker skipped');
+const etc = '# /etc/shells\n/bin/sh\n/bin/bash\n/usr/bin/bash\n/bin/zsh\n/usr/bin/git-shell\n/usr/sbin/nologin\n/usr/local/bin/fish\n';
+const ux = sysinfo.unixShells(etc, '/bin/zsh', true, (f) => f !== '/usr/local/bin/fish');
+assert.deepEqual(ux.map((p) => p.name), ['zsh', 'sh', 'bash'], '$SHELL first, deduped, no nologin/git-shell, only what exists');
+assert.deepEqual(ux[0].args, ['-l'], 'login shells on macOS');
+assert.deepEqual(sysinfo.unixShells(etc, '', false, () => true)[0], { name: 'bash', shell: '/bin/bash', args: [] }, 'no $SHELL: bash; Linux: no -l');
+
 // --- tempo follows the hands ---
 const a = new Activity();
 assert.equal(a.targetBpm({ mode: 'reactive' }), SLOW_BPM, 'idle is slow');

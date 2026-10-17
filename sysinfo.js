@@ -100,4 +100,25 @@ async function fetchFeeds(urls) {
   return all.flat();
 }
 
-module.exports = { parseNet, netConns, parseProcs, procs, parseFeed, fetchFeeds, SERVICES };
+// Shell profiles, from what is installed. Pure, so the self-check runs them on every platform.
+// WSL: one profile per distro (`wsl -l -q`, UTF-16), like Windows Terminal. Plain `wsl.exe` opens
+// the default distro, which may be a broken or Docker one; Docker Desktop's own are skipped.
+function wslDistros(out) {
+  return String(out).replace(/\0/g, '').split(/\r?\n/).map((l) => l.trim())
+    .filter((d) => d && !/^docker-desktop/i.test(d) && !/^Windows Subsystem|^There are no/i.test(d))
+    .map((d) => ({ name: `${d} (WSL)`, shell: 'wsl.exe', args: ['-d', d] }));
+}
+// macOS/Linux: $SHELL first, then /etc/shells, one per name, skipping the ones that are not for
+// people (nologin, git-shell). macOS terminals start login shells (-l), or PATH comes up short.
+function unixShells(etcShells, current, mac, exists) {
+  const out = [], seen = new Set();
+  const list = String(etcShells).split('\n').map((l) => l.trim()).filter((l) => l.startsWith('/'));
+  for (const s of [current || '/bin/bash', ...list]) {
+    const name = s.split('/').pop();
+    if (seen.has(name) || /nologin|false|git-shell|rbash/.test(name) || !exists(s)) continue;
+    seen.add(name); out.push({ name, shell: s, args: mac ? ['-l'] : [] });
+  }
+  return out;
+}
+
+module.exports = { parseNet, netConns, parseProcs, procs, parseFeed, fetchFeeds, wslDistros, unixShells, SERVICES };

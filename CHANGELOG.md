@@ -4,6 +4,16 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-17
+
+### Fixed
+- WSL: one profile per distro ("Ubuntu (WSL)", `wsl.exe -d Ubuntu`), like Windows Terminal,
+  instead of plain `wsl.exe`, which opens whatever the default distro is (a broken or Docker
+  one drops you to root). Docker Desktop's distros are skipped.
+- macOS: shells start as login shells (`-l`), so PATH from `/etc/zprofile` is there. Linux and
+  macOS skip `/etc/shells` entries that are not for people (nologin, git-shell).
+- The shell detection is covered by the self-check, so CI exercises it on all three systems.
+
 ## [0.8.0] - 2026-10-17
 
 ### Added
