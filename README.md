@@ -146,6 +146,7 @@ Everything below is also on the **right-click menu**.
 | `nyx <message>` | type it (or recall it with Up) in any pane and press Enter: NYX answers; the shell never runs it |
 | `Ctrl+Shift+T` / `Ctrl+Shift+X` | new tab / close tab (or the `+` button, and the `x` on each tab or a middle-click) |
 | `▾` next to `+` | new tab with another shell: PowerShell, PowerShell 7, cmd, WSL, Git Bash, whatever is installed |
+| double-click a tab | rename it (Enter keeps it, Esc backs out, empty goes back to the folder name); also right-click > Rename tab |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | next / previous tab (also `Ctrl+PageDown` / `Ctrl+PageUp`) |
 | `Ctrl+Shift+1`..`4` | that many panes in this tab. Shrinking keeps the focused pane |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | copy / paste |
@@ -249,7 +250,7 @@ remembered for you; everything else you edit by hand
   same name as a found shell replaces it. The old `shell` / `shellArgs` settings still work as the
   default when `defaultShell` is blank.
 - **Start tabs.** Set your tabs up (shell, folder, panes), then right-click > Tabs > **Open these
-  tabs on start**. Next launch they come back in the same shells and folders. Or write
+  tabs on start**. Next launch they come back in the same shells, folders and names. Or write
   `startupTabs` by hand. "Forget the start tabs" goes back to one default tab.
 - `world`: the world to start in (blank: NYX decides). `nyxWorlds: false` keeps you there.
 - `cigarette`: the one that burns while you compile (also on the right-click menu).

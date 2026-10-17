@@ -35,6 +35,7 @@
     t.btn.innerHTML = '<span class="lbl"></span><span class="x" title="close tab">×</span>';
     t.btn.onclick = (e) => { if (e.target.classList.contains('x')) closeTab(t); else switchTab(t); };
     t.btn.onauxclick = (e) => { if (e.button === 1) closeTab(t); };
+    t.btn.ondblclick = (e) => { if (!e.target.classList.contains('x')) renameTab(t); };
     $('tabs').insertBefore(t.btn, $('newtab'));
     tabs.push(t); makePane(t); label(t);
     window.gibson.listDir(t.panes[0].id).then((fs) => { t.cwdName = baseName(fs.cwd); label(t); });
@@ -42,7 +43,23 @@
   }
   function label(t) {
     const shell = t.opts.profile && t.opts.profile !== B.defaultShell ? ` (${t.opts.profile})` : '';
-    t.btn.firstChild.textContent = `${t.n}:${t.cwdName || 'shell'}${shell}${t.panes.length > 1 ? ' [' + t.panes.length + ']' : ''}`;
+    const name = t.opts.name || `${t.cwdName || 'shell'}${shell}`; // a name you gave it wins over the folder
+    t.btn.firstChild.textContent = `${t.n}:${name}${t.panes.length > 1 ? ' [' + t.panes.length + ']' : ''}`;
+  }
+  // Rename in place: Enter keeps it, Escape backs out, an empty name goes back to the folder.
+  function renameTab(t) {
+    const lbl = t.btn.firstChild, inp = document.createElement('input');
+    inp.className = 'rename'; inp.value = t.opts.name || ''; inp.placeholder = t.cwdName || 'name';
+    lbl.replaceWith(inp); inp.focus(); inp.select();
+    let done = false;
+    const finish = (keep) => {
+      if (done) return; done = true;
+      if (keep) t.opts = { ...t.opts, name: inp.value.trim() || undefined };
+      inp.replaceWith(lbl); label(t); if (focused) focused.term.focus();
+    };
+    inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') finish(false); };
+    inp.onblur = () => finish(true);
+    inp.onclick = (e) => e.stopPropagation();
   }
   function switchTab(t) {
     tab = t;
@@ -176,7 +193,7 @@
   }
 
   if (B.startTabs.length && !B.shot) { // the saved start tabs
-    for (const s of B.startTabs) { const t = makeTab({ profile: s.profile, cwd: s.cwd }); if (s.panes > 1) { switchTab(t); setPanes(s.panes); } }
+    for (const s of B.startTabs) { const t = makeTab({ profile: s.profile, cwd: s.cwd, name: s.name }); if (s.panes > 1) { switchTab(t); setPanes(s.panes); } }
     switchTab(tabs[0]);
   } else switchTab(makeTab());
   if (B.panes > 1) setPanes(B.panes);
@@ -297,7 +314,7 @@
     else if (a === 'logo') { setLogo(!cfg.logo); window.gibson.save('logo', cfg.logo); }
     else if (a === 'cigarette') { cfg.cigarette = cfg.cigarette === false; window.gibson.save('cigarette', cfg.cigarette); }
     else if (a === 'nyxworlds') { cfg.nyxWorlds = cfg.nyxWorlds === false; window.gibson.save('nyxWorlds', cfg.nyxWorlds); }
-    else if (a === 'tabs:save') { window.gibson.saveTabs(tabs.map((x) => ({ id: x.panes[0].id, panes: x.panes.length }))); nyx.ctx.say(`${tabs.length} tab${tabs.length > 1 ? 's' : ''} saved. They will be waiting next time.`, 'tender'); }
+    else if (a === 'tabs:save') { window.gibson.saveTabs(tabs.map((x) => ({ id: x.panes[0].id, panes: x.panes.length, name: x.opts.name }))); nyx.ctx.say(`${tabs.length} tab${tabs.length > 1 ? 's' : ''} saved. They will be waiting next time.`, 'tender'); }
     else if (a === 'packets') { cfg.packets = cfg.packets === false; window.gibson.save('packets', cfg.packets); }
     else if (a === 'tempo') { cfg.music.mode = cfg.music.mode === 'reactive' ? 'fixed' : 'reactive'; nyx.ctx.say(`Tempo ${cfg.music.mode === 'fixed' ? 'locked at ' + cfg.music.bpm : 'follows your hands'}.`, 'playful'); }
     else if (a === 'nyx') { cfg.nyx.on = !cfg.nyx.on; $('nyx').style.opacity = cfg.nyx.on ? 1 : 0.3; }
@@ -314,6 +331,7 @@
     else if (a === 'newtab') return switchTab(makeTab());
     else if (a.startsWith('newtab:')) return switchTab(makeTab({ profile: a.slice(7) }));
     else if (a === 'closetab') return closeTab(tab);
+    else if (a === 'renametab') return renameTab(tab);
     else if (a === 'nexttab') return stepTab(1);
     else if (a === 'prevtab') return stepTab(-1);
     else if (a === 'fullscreen') window.gibson.fullscreen();

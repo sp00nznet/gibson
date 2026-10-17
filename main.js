@@ -240,6 +240,7 @@ function contextMenu(st) {
     item('New tab', 'newtab', 'T'),
     { label: 'New tab with', submenu: shellItems(act) },
     item('Close tab', 'closetab', 'X'),
+    { label: 'Rename tab...', click: act('renametab') },
     { label: 'Tabs', submenu: [
       { label: 'Open these tabs on start', click: act('tabs:save') },
       { label: `Forget the start tabs${cfg.startupTabs.length ? ` (${cfg.startupTabs.length})` : ''}`, enabled: cfg.startupTabs.length > 0, click: () => writeCfg('startupTabs', []) },
@@ -353,7 +354,7 @@ app.whenReady().then(() => {
   // The tabs as they are now become the start tabs. The page sends each tab's first pane id
   // and pane count; the shell and folder are known here.
   ipcMain.on('tabs:save', (_e, list) => {
-    const tabs = list.map((t) => { const p = panes.get(t.id); return p && { profile: p.prof.name, cwd: p.cwd, panes: t.panes }; }).filter(Boolean);
+    const tabs = list.map((t) => { const p = panes.get(t.id); return p && { profile: p.prof.name, cwd: p.cwd, panes: t.panes, ...(t.name ? { name: String(t.name).slice(0, 40) } : {}) }; }).filter(Boolean);
     writeCfg('startupTabs', tabs);
   });
   ipcMain.on('menu:shells', () => Menu.buildFromTemplate(shellItems((a) => () => win.webContents.send('hotkey', a))).popup({ window: win }));

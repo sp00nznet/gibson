@@ -45,6 +45,7 @@ body.unframed #frame { inset: 0; border: none; box-shadow: none; transform: none
 }
 /* tab bar: always there, so + and the shell picker are; the lone tab has no close button */
 #tabs { flex: none; display: flex; gap: 2px; padding: 4px 6px 0; overflow-x: auto; background: rgba(0, 0, 0, 0.55); }
+#tabs .rename { font: inherit; color: #fff; background: #000; border: 1px solid rgba(255, 46, 136, 0.8); padding: 0 4px; width: 14ch; outline: none; }
 #tabs .x { margin-left: 8px; color: #4d6b5c; padding: 0 2px; }
 #tabs .x:hover { color: #ff3864; }
 #tabs.solo .x { display: none; }

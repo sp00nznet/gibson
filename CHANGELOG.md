@@ -4,6 +4,11 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-17
+
+### Added
+- Rename tabs: double-click a tab (or right-click > Rename tab). Saved start tabs keep their names.
+
 ## [0.8.1] - 2026-10-17
 
 ### Fixed
