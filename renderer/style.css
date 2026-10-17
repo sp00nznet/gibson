@@ -1,0 +1,77 @@
+:root {
+  --neon: #39ff9c;
+  --hot: #ff2e88;
+  --ice: #36d6ff;
+  --glow: 0;            /* 0..1, driven by the beat */
+  --warp: 0;            /* 0..1, driven by typing activity */
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--neon); font-family: 'Cascadia Mono', Consolas, monospace; }
+canvas { display: block; }
+#world, #rain, #smoke, #crt { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#world { z-index: 0; }
+
+#frame {
+  position: fixed; z-index: 2;
+  left: 17%; right: 17%; top: 7%; bottom: 7%;
+  display: flex; flex-direction: column;
+  border: 1px solid rgba(57, 255, 156, calc(0.35 + var(--glow) * 0.6));
+  box-shadow:
+    0 0 calc(12px + var(--glow) * 40px) rgba(57, 255, 156, calc(0.25 + var(--glow) * 0.4)),
+    0 0 calc(var(--warp) * 120px) rgba(255, 46, 136, calc(var(--warp) * 0.5)),
+    inset 0 0 30px rgba(0, 0, 0, 0.9);
+  transform: perspective(1400px) translateZ(calc(var(--warp) * 22px));
+  transition: transform 0.25s ease-out;
+}
+/* unframed: the terminal takes the whole window, the scene shows through the panes */
+body.unframed #frame { inset: 0; border: none; box-shadow: none; transform: none; }
+/* the frame's furniture is dark; the terminal area is left to each pane's opacity */
+#banner, #scroller { background: rgba(0, 0, 0, 0.55); }
+.xterm .xterm-viewport { background-color: transparent !important; }
+#banner { height: 64px; position: relative; flex: none; border-bottom: 1px solid rgba(57, 255, 156, 0.25); }
+#logo { width: 100%; height: 100%; }
+#status { position: absolute; right: 12px; bottom: 6px; font-size: 11px; color: var(--ice); text-shadow: 0 0 6px var(--ice); white-space: pre; text-align: right; }
+#nyx {
+  flex: none; min-height: 28px; padding: 5px 12px; font-size: 14px;
+  color: #ffd6ec; text-shadow: 0 0 8px var(--hot), 0 0 2px #fff;
+  border-bottom: 1px solid rgba(255, 46, 136, 0.25); background: linear-gradient(90deg, rgba(255,46,136,0.12), transparent 70%), rgba(0, 0, 0, 0.55);
+}
+#nyx .tag { color: var(--hot); font-weight: bold; }
+#nyx.glitch #nyxtext { animation: glitch 0.18s steps(2) 3; }
+@keyframes glitch {
+  0% { transform: translate(0); text-shadow: 2px 0 var(--ice), -2px 0 var(--hot); }
+  50% { transform: translate(-2px, 1px); text-shadow: -3px 0 var(--ice), 3px 0 var(--hot); }
+  100% { transform: translate(1px, -1px); }
+}
+#termwrap { flex: 1; min-height: 0; display: grid; grid-template: 1fr / 1fr; gap: 6px; }
+#termwrap:not(.n1) { padding: 6px; }
+#termwrap.n2 { grid-template: 1fr / 1fr 1fr; }
+#termwrap.n3, #termwrap.n4 { grid-template: 1fr 1fr / 1fr 1fr; }
+#termwrap.n3 .pane:first-child { grid-row: span 2; }
+/* each pane has its own opacity (--term-alpha, set per pane by app.js) */
+.pane { min-width: 0; min-height: 0; overflow: hidden; padding: 8px 10px; background: rgba(2, 6, 4, var(--term-alpha, 0.86)); }
+#termwrap:not(.n1) .pane { padding: 4px 6px; border: 1px solid rgba(57, 255, 156, 0.18); }
+#termwrap:not(.n1) .pane.focus { border-color: rgba(255, 46, 136, 0.7); box-shadow: 0 0 12px rgba(255, 46, 136, 0.35); }
+#scroller { flex: none; height: 40px; width: 100%; border-top: 1px solid rgba(57, 255, 156, 0.25); }
+
+#rain { z-index: 3; opacity: 0; transition: opacity 0.6s; }
+#rain.on { opacity: 0.22; }
+#smoke { z-index: 4; }
+#crt {
+  z-index: 5;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.65) 100%);
+  animation: flicker 0.12s infinite;
+}
+@keyframes flicker { 0%, 100% { opacity: 0.92; } 50% { opacity: 1; } }
+
+#boot { position: fixed; inset: 0; z-index: 10; background: #000; display: flex; align-items: center; justify-content: center; transition: opacity 0.8s; }
+#boot.gone { opacity: 0; pointer-events: none; }
+#bootlog { color: var(--neon); font-size: 18px; text-shadow: 0 0 8px var(--neon); min-width: 560px; }
+.xterm .xterm-scrollable-element > .scrollbar > .slider { background: rgba(57, 255, 156, 0.18) !important; }
+.xterm .xterm-scrollable-element > .scrollbar > .scra { display: none; }
+.xterm .xterm-scrollable-element > .shadow { box-shadow: none !important; }
+::-webkit-scrollbar { width: 8px; background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(57, 255, 156, 0.2); }
+::-webkit-scrollbar-button { display: none; }

@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+<title>GIBSON</title>
+<link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="world"></canvas>
+  <div id="frame">
+    <div id="banner"><canvas id="logo"></canvas><div id="status"></div></div>
+    <div id="nyx"><span class="tag">NYX&gt;</span> <span id="nyxtext"></span></div>
+    <div id="termwrap" class="n1"></div>
+    <canvas id="scroller"></canvas>
+  </div>
+  <canvas id="rain"></canvas>
+  <canvas id="smoke"></canvas>
+  <div id="crt"></div>
+  <div id="boot"><pre id="bootlog"></pre></div>
+
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="../node_modules/@xterm/addon-webgl/lib/addon-webgl.js"></script>
+  <script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+  <script src="../node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js"></script>
+  <script src="activity.js"></script>
+  <script src="audio.js"></script>
+  <script src="worlds.js"></script>
+  <script src="fx.js"></script>
+  <script src="nyx.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

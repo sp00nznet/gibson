@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: runner.os == 'Windows'
+      - run: npm test
+        if: runner.os == 'Windows'
+      # macOS and Linux go through the quick-start script, so it is tested from a clean checkout
+      - run: ./setup.sh < /dev/null || { cat setup.log; exit 1; }
+        if: runner.os != 'Windows'
+      # node-pty must load in plain Node too; on Linux it is compiled during npm ci
+      - run: node -e "require('node-pty'); console.log('node-pty ok')"
