@@ -317,7 +317,9 @@ remembered for you; everything else you edit by hand
   the screen like a console.
 - `irc.mode`: `fake` (a simulated #hackers: the movie's cast, NYX as op, reacting to what you do),
   `real` (connects to `server` as `nick` and joins `channels`; nothing else about you is sent), or
-  `off`. The panel only dials when you open it. Slash commands work: `/me /nick /join /part /msg /topic`.
+  `off`. Switch it from the right-click menu (IRC lobby); that re-reads this section, so change
+  `server`/`nick`/`channels` here, then pick Real IRC again. The panel only dials when you open it.
+  Slash commands work: `/me /nick /join /part /msg /topic`.
 - `music.source`: `synth` or `folder` (the jukebox, playing `music.folder`).
 - `news.feeds`: any RSS or Atom URLs, fetched every `news.minutes`. `[]` turns the newswire off
   (nothing is fetched).

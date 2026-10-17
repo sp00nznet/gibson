@@ -4,6 +4,13 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-17
+
+### Fixed
+- The IRC lobby can switch to a real server from the right-click menu (IRC lobby > Real IRC),
+  without a restart. Switching re-reads `irc` from config.json.
+- `hack the planet` no longer reaches the shell, so it stops failing as an unknown command.
+
 ## [0.10.0] - 2026-10-17
 
 ### Added

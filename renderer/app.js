@@ -144,7 +144,7 @@
       const raw = shown && shown.trim() ? shown : enter ? p.line : '';
       const cmd = raw.trim();
       // GIBSON's own commands (`nyx <message>`, `dial 555-0199`, `nfo file`...) never reach the shell.
-      const own = enter && /^(nyx|dial|wardial|nfo|scan|cookie)(\s|$)/i.exec(cmd);
+      const own = enter && /^(nyx|dial|wardial|nfo|scan|cookie|hack(?=\s+the\s+planet\b))(\s|$)/i.exec(cmd);
       if (own && (own[1].toLowerCase() === 'nyx' || cfg.hackerCommands !== false)) {
         // Erase the line with backspaces rather than Ctrl+C, which leaves a ^C behind.
         // Backspace means the same in PowerShell, cmd, bash and zsh.
@@ -273,7 +273,6 @@
     }, 250);
     if (/^git\b/i.test(cmd)) setTimeout(() => refreshGit(p), 1200); // new commits ignite in the galaxy
     if (cmd) setTimeout(() => { if (!p.errorSeen && p.lastCmd === cmd) Worlds.signal('ok'); }, 1500);
-    if (/hack\s+the\s+planet/i.test(cmd) && !B.world) Worlds.go('hack');
     $('frame').style.setProperty('--warp', 1); warp = 1; // the Enter lunge
     nyx.command(cmd);
     if (cmd) ircPanel.event(/^git\s+commit\b/i.test(cmd) ? 'commit' : NYX_KIND(cmd), cmd);
@@ -284,6 +283,7 @@
   function builtin(p, name, arg) {
     const back = () => p.term.focus();
     if (name === 'nyx') return nyxChat(p, arg);
+    if (name === 'hack') { if (!B.world) Worlds.go('hack'); return nyx.ctx.say('HACK THE PLANET!', 'intense'); }
     if (name === 'dial') return dialBbs(arg || '555-0199');
     if (name === 'scan') return Theatre.scan(p.el, arg || 'gibson.ellingson.net', back);
     if (name === 'cookie') return Theatre.cookie(p.el, back);
@@ -364,11 +364,12 @@
   });
 
   // --- the IRC lobby (renderer/irc.js): a fake #hackers unless config.json says real ---
-  const ircPanel = IrcPanel.create($('irc'), {
-    mode: (cfg.irc && cfg.irc.mode) || 'fake', nick: (cfg.irc && cfg.irc.nick) || B.user,
+  const makeIrc = (mode) => IrcPanel.create($('irc'), {
+    mode, nick: (cfg.irc && cfg.irc.nick) || B.user,
     ask: cfg.llm.provider === 'none' ? null : (text, history) => window.gibson.llm({ kind: 'chat', message: text, history, ...nyx.ctx.info() }).then((l) => l && l.text),
     onFocusTerminal: () => focused.term.focus(),
   });
+  let ircPanel = makeIrc((cfg.irc && cfg.irc.mode) || 'fake');
   if (cfg.ircOpen || B.irc) ircPanel.show();
   Theatre.volume = B.shot ? 0 : cfg.music.volume;
 
@@ -463,6 +464,7 @@
     else if (a === 'zoompane') { if (tab.panes.length > 1) { tab.zoom = !tab.zoom; for (const x of tab.panes) x.el.classList.toggle('zoom', tab.zoom && x === focused); layout(tab); } }
     else if (a === 'evenpanes') { tab.c = tab.r = 0.5; layout(tab); }
     else if (a.startsWith('tabcolor:')) { tab.opts = { ...tab.opts, color: a.slice(9) || undefined }; label(tab); }
+    else if (a.startsWith('irc:mode:')) { ircPanel.destroy(); ircPanel = makeIrc(a.slice(9)); ircPanel.show(); window.gibson.save('ircOpen', ircPanel.visible); return ircPanel.focus(); }
     else if (a === 'irc') { ircPanel.toggle(); window.gibson.save('ircOpen', ircPanel.visible); if (ircPanel.visible) return ircPanel.focus(); }
     else if (a === 'leet') { cfg.nyx.leet = !cfg.nyx.leet; window.gibson.save('nyxLeet', cfg.nyx.leet); nyx.ctx.say(cfg.nyx.leet ? 'Elite mode. Try to keep up, newbie.' : 'Plain speech. For the slow.', 'playful'); }
     else if (a === 'pasteguard') { cfg.pasteGuard = cfg.pasteGuard === false; window.gibson.save('pasteGuard', cfg.pasteGuard); }

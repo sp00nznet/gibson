@@ -220,11 +220,11 @@
   // --- the panel ---
   const pad = (n) => String(n).padStart(2, '0');
   const stamp = (t) => { const d = t ? new Date(t) : new Date(); return `[${pad(d.getHours())}:${pad(d.getMinutes())}]`; };
-  const STUB = { show() {}, hide() {}, toggle() {}, event() {}, focus() {}, visible: false };
+  const STUB = { show() {}, hide() {}, toggle() {}, event() {}, focus() {}, destroy() {}, visible: false };
 
   function create(el, opts) {
     opts = opts || {};
-    if (opts.mode === 'off') return STUB;
+    if (opts.mode === 'off') { el.classList.add('irc-off'); return STUB; }
     const real = opts.mode === 'real';
     const bridge = real && root.gibson && root.gibson.irc;
     el.classList.add('irc-panel', 'irc-off');
@@ -300,13 +300,13 @@
     }
 
     const fake = real ? null : new Fake(onEvent, { nick: panel.nick, ask: opts.ask });
-    let started = false;
+    let started = false, timer = null, unsub = null;
     function start() { // fake mode chats from the start; real mode dials only when first shown
       if (started) return; started = true;
-      if (fake) { fake.start(); setInterval(() => fake.tick(1), 1000); return; }
+      if (fake) { fake.start(); timer = setInterval(() => fake.tick(1), 1000); return; }
       if (!bridge) return onEvent({ type: 'error', text: 'no IRC bridge in this build' });
-      bridge.onEvent(onEvent);
-      bridge.connect().then((info) => { if (info && info.nick) { panel.nick = info.nick; showNick(); } else if (!info) onEvent({ type: 'error', text: 'real IRC is off: set irc.mode to "real" in config.json' }); });
+      unsub = bridge.onEvent(onEvent);
+      bridge.connect().then((info) => { if (info && info.nick) { panel.nick = info.nick; showNick(); } else if (!info) onEvent({ type: 'error', text: 'real IRC is off: right-click > IRC lobby > Real IRC' }); });
     }
 
     // Keys typed here belong here: none of them may reach the terminal.
@@ -347,6 +347,7 @@
       hide() { el.classList.add('irc-off'); panel.visible = false; },
       toggle() { if (panel.visible) panel.hide(); else panel.show(); },
       focus() { input.focus(); },
+      destroy() { clearInterval(timer); if (unsub) unsub(); el.classList.add('irc-off'); el.textContent = ''; }, // before a new mode takes the panel
       event(kind, detail) { if (fake) fake.event(kind, detail); }, // real channels are real people: no puppets there
     });
   }

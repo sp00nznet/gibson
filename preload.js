@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('gibson', {
   irc: { // the IRC lobby's real mode (irc.js); fake mode needs none of this
     connect: () => ipcRenderer.invoke('irc:connect'),
     command: (line, target) => ipcRenderer.send('irc:command', line, target),
-    onEvent: (fn) => ipcRenderer.on('irc:event', (_e, ev) => fn(ev)),
+    onEvent: (fn) => { const h = (_e, ev) => fn(ev); ipcRenderer.on('irc:event', h); return () => ipcRenderer.removeListener('irc:event', h); },
   },
   linkCheck: (id, files) => ipcRenderer.invoke('link:check', id, files),
   linkOpen: (id, file, line, col) => ipcRenderer.send('link:open', id, file, line, col),

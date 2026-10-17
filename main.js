@@ -342,7 +342,13 @@ function contextMenu(st) {
     item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
     { label: 'Cigarette while compiling', type: 'checkbox', checked: cfg.cigarette !== false, click: act('cigarette') },
     item('NYX', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
-    item('IRC lobby', 'irc', 'I', { type: 'checkbox', checked: st.irc }),
+    { label: 'IRC lobby', submenu: [
+      item('Show', 'irc', 'I', { type: 'checkbox', checked: st.irc }),
+      { type: 'separator' },
+      ...[['fake', 'Simulated #hackers'], ['real', `Real IRC: ${cfg.irc.server} ${(cfg.irc.channels || []).join(' ')}`], ['off', 'Off']].map(([m, label]) =>
+        ({ label, type: 'radio', checked: cfg.irc.mode === m, click: () => setIrcMode(m) })),
+      { label: 'Server, nick, channels... (config.json, then pick Real again)', click: () => shell.openPath(cfg.file) },
+    ] },
     { label: 'NYX speaks 1337', type: 'checkbox', checked: st.leet, click: act('leet') },
     item('Matrix rain', 'rain', 'R'),
     { type: 'separator' },
@@ -353,6 +359,13 @@ function contextMenu(st) {
     { label: 'Fullscreen', accelerator: 'F11', registerAccelerator: false, click: act('fullscreen') },
     { label: 'Open config.json', click: () => shell.openPath(cfg.file) },
   ]);
+}
+
+// Switching the lobby's mode re-reads config.json's irc section, so edits there take effect.
+function setIrcMode(mode) {
+  if (irc) { irc.quit('changing servers'); irc = null; }
+  writeCfg('irc', { ...(SHOT ? cfg.irc : loadConfig().irc), mode });
+  win.webContents.send('hotkey', 'irc:mode:' + mode);
 }
 
 function createWindow() {
