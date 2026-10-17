@@ -53,7 +53,7 @@ const DEFAULTS = {
   opacity: 0.86,              // terminal background: 1 solid, 0 see the world straight through
   boot: true,                 // the modem dial-in on startup
   music: { on: true, mode: 'reactive', bpm: 128, volume: 0.55, source: 'synth', folder: '', shuffle: true }, // source: synth | folder
-  nyx: { on: true, voice: false, chatter: 0.35 },
+  nyx: { on: true, voice: false, chatter: 0.35, leet: false },
   llm: {
     provider: 'ollama',       // ollama | anthropic | openai | none
     model: '',                // blank = provider default (llm.js)
@@ -312,6 +312,7 @@ function contextMenu(st) {
     item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
     { label: 'Cigarette while compiling', type: 'checkbox', checked: cfg.cigarette !== false, click: act('cigarette') },
     item('NYX', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
+    { label: 'NYX speaks 1337', type: 'checkbox', checked: st.leet, click: act('leet') },
     item('Matrix rain', 'rain', 'R'),
     { type: 'separator' },
     { label: 'Pane opacity', submenu: [1, 0.86, 0.7, 0.5, 0.3, 0.15, 0].map((o) => ({ label: `${Math.round(o * 100)}%`, type: 'radio', checked: Math.abs(o - st.opacity) < 0.01, click: act('opacity:' + o) })) },
@@ -388,6 +389,7 @@ app.whenReady().then(() => {
   ipcMain.handle('fs:list', (_e, id) => { const d = (panes.get(id) || { cwd: home }).cwd; return { cwd: SHOT ? 'C:\\GIBSON' : d, entries: listDir(d) }; });
   ipcMain.on('cfg:save', (_e, key, v) => { // view choices remembered across restarts
     if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'cigarette', 'fontSize', 'pasteGuard'].includes(key)) writeCfg(key, v);
+    if (key === 'nyxLeet') writeCfg('nyx', { ...cfg.nyx, leet: !!v });
   });
   // The tabs as they are now become the start tabs. The page sends each tab's first pane id
   // and pane count; the shell and folder are known here.

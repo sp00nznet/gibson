@@ -302,19 +302,31 @@
   if (B.tabs > 1) switchTab(tabs[0]);
 
   // --- NYX --------------------------------------------------------------------
-  const scrollBase = '      GIBSON  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  type  nyx <message>  to talk to her  ctrl+shift+O see-through  ctrl+shift+F frame  ctrl+shift+S hide this scroller  ctrl+shift+L hide the logo  ctrl+shift+D data packets  ctrl+shift+J your own music  ctrl+shift+P play/pause  ctrl+shift+[ ] tracks  right-click for the menu  F11 fullscreen  ::  ';
-  let scroll = scrollBase;
+  // The scroller: greetz (a few at a time, rotating), the keys, and NYX's last line.
+  const GREETZ = ['f0rkz', 'sp00nz', 'the S1LV3RWAREZ crew', 'Zero Cool', 'Acid Burn', 'Cereal Killer', 'Lord Nikon', 'Phantom Phreak', 'Razor & Blade',
+    'everyone at 2600', 'the #hackers regulars', 'all the sysops still running a BBS', 'whoever wrote the first keygen music', 'NOT the Plague'];
+  const KEYS = 'ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  ctrl+shift+F find  ctrl+= bigger text  type  nyx <message>  to talk to her  dial 555-0199 for the BBS  ctrl+shift+O see-through  ctrl+shift+U frame  ctrl+shift+S hide this scroller  ctrl+shift+L hide the logo  ctrl+shift+D data packets  ctrl+shift+J your own music  ctrl+shift+P play/pause  ctrl+shift+[ ] tracks  right-click for the menu  F11 fullscreen';
+  let greet = 0, nyxTail = '';
+  setInterval(() => { greet = (greet + 3) % GREETZ.length; }, 45000);
+  const scrollText = () => {
+    const g = [0, 1, 2].map((i) => GREETZ[(greet + i) % GREETZ.length]);
+    return `      GIBSON  ::  NYX IS WATCHING  ::  greetz to ${g[0]}, ${g[1]} and ${g[2]}  ::  hack the planet  ::  ${KEYS}  ::  ${nyxTail}`;
+  };
+  // 1337 5p34k, when NYX is in the mood (right-click > NYX speaks 1337). Not every letter: it stays readable.
+  const LEET = { a: '4', e: '3', i: '1', o: '0', s: '5', t: '7', l: '1', g: '9', b: '8' };
+  const leet = (s) => s.replace(/[aeiostlgb]/gi, (c) => (Math.random() < 0.65 ? LEET[c.toLowerCase()] : c));
   const nyx = new Nyx(cfg, {
     info: () => ({ user: B.user, host: B.host, hour: new Date().getHours(), activity: act.level().toFixed(2), cwd: (worldEnv.fs && worldEnv.fs.cwd) || B.cwd }),
     llm: (ev) => window.gibson.llm(ev),
-    say(text, mood, world) {
+    say(said, mood, world) {
+      const text = cfg.nyx.leet ? leet(said) : said;
       const el = $('nyxtext'); el.textContent = ''; let i = 0;
       $('nyx').classList.remove('glitch'); void $('nyx').offsetWidth; $('nyx').classList.add('glitch');
       const iv = setInterval(() => { el.textContent = text.slice(0, ++i); if (i >= text.length) clearInterval(iv); }, 28);
-      scroll = scrollBase + `NYX SAYS: ${text.toUpperCase()}  ::  `;
+      nyxTail = `NYX SAYS: ${text.toUpperCase()}  ::  `;
       go(world);
       if (cfg.nyx.voice && window.speechSynthesis) {
-        const u = new SpeechSynthesisUtterance(text); u.pitch = 0.55; u.rate = 1.02;
+        const u = new SpeechSynthesisUtterance(said); u.pitch = 0.55; u.rate = 1.02;
         const v = speechSynthesis.getVoices().find((x) => /zira|female|aria|jenny/i.test(x.name)); if (v) u.voice = v;
         speechSynthesis.cancel(); speechSynthesis.speak(u);
       }
@@ -352,7 +364,7 @@
   });
   if (B.world || cfg.world) Worlds.go(B.world || cfg.world);
   Fx.start({ logo: $('logo'), scroller: $('scroller'), rain: $('rain'), smoke: $('smoke') },
-    () => ({ pulse, level: act.level(), smoking: act.busyOut > 4, cig: cfg.cigarette !== false, scroll }));
+    () => ({ pulse, level: act.level(), smoking: act.busyOut > 4, cig: cfg.cigarette !== false, scroll: scrollText() }));
 
   // --- hotkeys + right-click menu: main.js catches the keys, both land here ----
   const OPACITY = [1, 0.86, 0.7, 0.5, 0.3, 0.15, 0];
@@ -412,6 +424,7 @@
     else if (a === 'zoompane') { if (tab.panes.length > 1) { tab.zoom = !tab.zoom; for (const x of tab.panes) x.el.classList.toggle('zoom', tab.zoom && x === focused); layout(tab); } }
     else if (a === 'evenpanes') { tab.c = tab.r = 0.5; layout(tab); }
     else if (a.startsWith('tabcolor:')) { tab.opts = { ...tab.opts, color: a.slice(9) || undefined }; label(tab); }
+    else if (a === 'leet') { cfg.nyx.leet = !cfg.nyx.leet; window.gibson.save('nyxLeet', cfg.nyx.leet); nyx.ctx.say(cfg.nyx.leet ? 'Elite mode. Try to keep up, newbie.' : 'Plain speech. For the slow.', 'playful'); }
     else if (a === 'pasteguard') { cfg.pasteGuard = cfg.pasteGuard === false; window.gibson.save('pasteGuard', cfg.pasteGuard); }
     else if (a === 'music') {
       cfg.music.on = !cfg.music.on;
@@ -454,7 +467,7 @@
     window.gibson.menu({
       selection: !!focused.term.getSelection(), panes: tab.panes.length, zoomed: !!tab.zoom, broadcast: !!tab.broadcast, tabColor: tab.opts.color || '', tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
       worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
-      music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
+      leet: !!cfg.nyx.leet, music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
       source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false, packets: cfg.packets !== false,
     });
   });
