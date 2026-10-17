@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('gibson', {
   onNews: (fn) => ipcRenderer.on('news', (_e, items) => fn(items)),
   onHotkey: (fn) => ipcRenderer.on('hotkey', (_e, a) => fn(a)),
   menu: (state) => ipcRenderer.send('menu', state),
+  musicList: () => ipcRenderer.invoke('music:list'),
+  musicPick: () => ipcRenderer.invoke('music:pick'),
   save: (key, v) => ipcRenderer.send('cfg:save', key, v),
   llm: (ev) => ipcRenderer.invoke('nyx:llm', ev),
   fullscreen: () => ipcRenderer.send('win:fullscreen'),

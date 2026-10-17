@@ -4,6 +4,21 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-17
+
+### Added
+- Jukebox: play a folder of your own music (mp3, ogg, opus, flac, wav, m4a, subfolders too)
+  instead of the synth, at its own tempo. Player in the bottom-right corner (previous, play/pause,
+  next, shuffle, volume, choose folder), on the right-click menu, and on keys: `Ctrl+Shift+J`
+  synth or folder, `P` play/pause, `]` / `[` next / previous, `=` / `-` volume. A beat detector
+  keeps the frame and worlds pumping on your track; NYX comments when a track starts.
+- `Ctrl+Shift+L` (or the menu) hides the GIBSON logo bar. Remembered as `logo`.
+- `--music <folder>` to start on the jukebox.
+
+### Changed
+- The README tells you what this thing is for (fun) and what is handy anyway.
+- Screenshot runs never write to `config.json`.
+
 ## [0.5.0] - 2026-10-17
 
 ### Added

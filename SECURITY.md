@@ -21,6 +21,9 @@ machine, and where keys live:
 - **NEWSWIRE** fetches the RSS/Atom URLs in `news.feeds` every `news.minutes` (default: Hacker
   News and The Register's security feed). Those requests carry nothing about you beyond what
   any feed reader sends. `"feeds": []` stops them. Headlines are passed to NYX.
+- **The jukebox** plays files from the folder you choose, through a `gibson-music:` protocol that
+  serves audio files from inside that folder only (no `file://` access for the page). Nothing is
+  copied or uploaded. NYX is told the file name of the track that starts.
 - **Screenshots** (`--shot`) never show the machine they run on: a made-up folder, user,
   connections, programs and headlines.
 - **The page.** Context isolation is on, Node integration is off, and the page's only

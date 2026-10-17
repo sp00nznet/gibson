@@ -50,6 +50,7 @@
     net: [['curious', 'Something new just opened a line out. I am watching it.'], ['intense', 'New connection. Friend of yours?'], ['playful', 'Packets, packets everywhere.']],
     hog: [['taunting', 'Something is eating your CPU alive. Not my problem. Mostly.'], ['intense', 'Runaway process. The hive is buzzing.'], ['bored', 'One process hogging everything. Typical.']],
     news: [['curious', 'Fresh off the wire. Read it before they take it down.'], ['taunting', 'The world keeps breaking things. You are in good company.'], ['playful', 'Breaking news: you still have not committed.']],
+    track: [['playful', 'Ooh. Turn it up.'], ['impressed', 'Good taste. For a human.'], ['taunting', 'This one again? Fine.'], ['curious', 'Never heard this one. Is it any good?']],
     late: [['tender', 'It is late, hacker. The best exploits are written at this hour.'], ['taunting', 'Still awake? Your sleep schedule is a vulnerability.']],
   };
 

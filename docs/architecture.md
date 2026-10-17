@@ -134,6 +134,26 @@ world's fading trails otherwise smears into an unreadable double image.
 `error` when a command's output looks like an error and `ok` 1.5 s after a command that did not;
 ICE WALL flares on the first and cracks open on the second.
 
+## The jukebox
+
+`renderer/jukebox.js` plays a folder of the user's music instead of the synth. Three things that
+took finding out:
+
+- **Serving the files.** The page is `file://` with a strict CSP, so `main.js` registers a
+  `gibson-music:` protocol (privileged before `ready`: `standard`, `secure`, `stream` so `<audio>`
+  can seek, `corsEnabled`) that serves audio files from inside the chosen folder only.
+- **WebAudio heard silence.** The beat detector routes the `<audio>` element through an
+  analyser. Media from another origin is "tainted" and a `MediaElementSource` outputs zeros for
+  it, which also silenced playback. The fix is `crossOrigin = 'anonymous'` on the element and an
+  `access-control-allow-origin` header on every protocol response.
+- **Finding the beat.** The analyser's bins are decibels mapped to 0-255; on that scale a kick
+  and the steady bass under it differ by only a few steps, so "well above the running average"
+  never triggered. The detector converts the 40-300 Hz bins back to linear magnitude, sets the
+  analyser's smoothing to 0.15 (the default 0.8 smears kicks together), and calls a beat when
+  energy jumps 1.5x over its running average, at most every 0.28 s. On a 140 BPM test loop it
+  finds 2-3 beats a second. Volume is a gain node *after* the analyser, so detection works at
+  any volume, including the silent screenshot runs.
+
 ## Headless screenshots
 
 `--shot file.png` makes an offscreen window, runs the app with fake typing, and saves a capture.

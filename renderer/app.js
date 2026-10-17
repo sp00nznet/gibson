@@ -175,7 +175,7 @@
   if (B.tabs > 1) switchTab(tabs[0]);
 
   // --- NYX --------------------------------------------------------------------
-  const scrollBase = '      GIBSON  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  type  nyx <message>  to talk to her  ctrl+shift+O see-through  ctrl+shift+F frame  ctrl+shift+S hide this scroller  right-click for the menu  F11 fullscreen  ::  ';
+  const scrollBase = '      GIBSON  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  type  nyx <message>  to talk to her  ctrl+shift+O see-through  ctrl+shift+F frame  ctrl+shift+S hide this scroller  ctrl+shift+L hide the logo  ctrl+shift+J your own music  ctrl+shift+P play/pause  ctrl+shift+[ ] tracks  right-click for the menu  F11 fullscreen  ::  ';
   let scroll = scrollBase;
   const nyx = new Nyx(cfg, {
     info: () => ({ user: B.user, host: B.host, hour: new Date().getHours(), activity: act.level().toFixed(2), cwd: (worldEnv.fs && worldEnv.fs.cwd) || B.cwd }),
@@ -235,11 +235,57 @@
   setFramed(cfg.framed !== false && !B.unframed);
   const setScroller = (on) => { cfg.scroller = on; document.body.classList.toggle('noscroll', !on); };
   setScroller(cfg.scroller !== false);
+  const setLogo = (on) => { cfg.logo = on; document.body.classList.toggle('nologo', !on); };
+  setLogo(cfg.logo !== false);
+
+  // --- the jukebox: the user's own folder instead of the synth (renderer/jukebox.js) ---
+  const juke = new Jukebox((t) => { $('track').textContent = t; nyx.event('track', { detail: t }, false); });
+  juke.shuffle = cfg.music.shuffle !== false; juke.volume(B.shot ? 0 : cfg.music.volume); // shots stay silent
+  const jukeOn = () => cfg.music.source === 'folder' && juke.tracks.length > 0;
+  const saveMusic = () => window.gibson.save('music', { source: cfg.music.source, folder: cfg.music.folder, shuffle: juke.shuffle, volume: cfg.music.volume, on: cfg.music.on });
+  function showPlayer() {
+    $('player').classList.toggle('off', !jukeOn());
+    $('pp').textContent = juke.playing ? '||' : '>'; $('shuf').classList.toggle('lit', juke.shuffle);
+  }
+  function useSource(src) { // 'synth' or 'folder'; the other one goes quiet
+    cfg.music.source = src;
+    if (jukeOn()) { if (music) music.stop(); if (cfg.music.on && !B.mute) juke.play(); }
+    else { cfg.music.source = 'synth'; juke.pause(); startMusic(); }
+    showPlayer(); saveMusic();
+  }
+  async function pickFolder() {
+    const list = await window.gibson.musicPick(); if (!list) return;
+    cfg.music.folder = list.folder; juke.load(list);
+    if (!list.tracks.length) { nyx.ctx.say('No music in that folder. Not even a MOD file.', 'bored'); return; }
+    useSource('folder');
+  }
+  function musicAction(a) {
+    if (a === 'music:pick') return pickFolder();
+    if (a === 'music:synth') return useSource('synth');
+    if (a === 'music:folder' || (a === 'music:source' && cfg.music.source === 'synth')) return juke.tracks.length ? useSource('folder') : pickFolder();
+    if (a === 'music:source') return useSource('synth');
+    if (a === 'music:volup' || a === 'music:voldown') {
+      cfg.music.volume = Math.max(0, Math.min(1, cfg.music.volume + (a === 'music:volup' ? 0.1 : -0.1)));
+      juke.volume(cfg.music.volume); if (music) music.volume(cfg.music.volume);
+      $('track').textContent = `VOL ${Math.round(cfg.music.volume * 100)}%`; setTimeout(() => { $('track').textContent = juke.title; }, 1200);
+    } else if (jukeOn()) {
+      if (a === 'music:toggle') juke.toggle(); else if (a === 'music:next') juke.next(); else if (a === 'music:prev') juke.prev();
+      else if (a === 'music:shuffle') juke.setShuffle(!juke.shuffle);
+    } else if (a === 'music:toggle') { cfg.music.on = !cfg.music.on; if (cfg.music.on) startMusic(); else if (music) music.stop(); }
+    showPlayer(); saveMusic();
+  }
+  for (const b of document.querySelectorAll('#player button')) b.onclick = () => { musicAction(b.dataset.a); focused.term.focus(); };
   function action(a) {
     const t = focused.term;
     if (a === 'copy') navigator.clipboard.writeText(t.getSelection());
     else if (a === 'paste') navigator.clipboard.readText().then((s) => t.paste(s));
-    else if (a === 'music') { cfg.music.on = !cfg.music.on; if (cfg.music.on) startMusic(); else if (music) music.stop(); }
+    else if (a === 'music') {
+      cfg.music.on = !cfg.music.on;
+      if (jukeOn()) { if (cfg.music.on) juke.play(); else juke.pause(); showPlayer(); } else if (cfg.music.on) startMusic(); else if (music) music.stop();
+      saveMusic();
+    }
+    else if (a.startsWith('music:')) return musicAction(a);
+    else if (a === 'logo') { setLogo(!cfg.logo); window.gibson.save('logo', cfg.logo); }
     else if (a === 'tempo') { cfg.music.mode = cfg.music.mode === 'reactive' ? 'fixed' : 'reactive'; nyx.ctx.say(`Tempo ${cfg.music.mode === 'fixed' ? 'locked at ' + cfg.music.bpm : 'follows your hands'}.`, 'playful'); }
     else if (a === 'nyx') { cfg.nyx.on = !cfg.nyx.on; $('nyx').style.opacity = cfg.nyx.on ? 1 : 0.3; }
     else if (a === 'world') { const n = Worlds.names; Worlds.go(n[(n.indexOf(Worlds.current()) + 1) % n.length]); }
@@ -268,6 +314,7 @@
       selection: !!focused.term.getSelection(), panes: tab.panes.length, tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
       worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
       music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
+      source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false,
     });
   });
 
@@ -277,11 +324,12 @@
     const now = performance.now(), dt = (now - lastT) / 1000; lastT = now;
     act.tick(dt);
     const lvl = act.level();
-    if (music) { music.level = lvl; music.bpm = act.glide(dt, cfg.music); pulse = music.on ? music.pulse() : 0; }
+    if (jukeOn()) pulse = Math.max(juke.pulse(), pulse - dt * 3); // the beat of your own track
+    else if (music) { music.level = lvl; music.bpm = act.glide(dt, cfg.music); pulse = music.on ? music.pulse() : 0; }
     else pulse = Math.max(0, pulse - dt * 3);
     warp = Math.max(lvl, warp - dt * 2.5);
     const fr = $('frame').style; fr.setProperty('--glow', pulse.toFixed(3)); fr.setProperty('--warp', warp.toFixed(3));
-    $('status').textContent = `${Math.round(act.bpm)} BPM  ${'▮'.repeat(Math.round(lvl * 10)).padEnd(10, '▯')}\n${Worlds.label()}  //  ${B.user}@${B.host}`;
+    $('status').textContent = `${jukeOn() ? (juke.playing ? 'JUKEBOX' : 'PAUSED') : Math.round(act.bpm) + ' BPM'}  ${'▮'.repeat(Math.round(lvl * 10)).padEnd(10, '▯')}\n${Worlds.label()}  //  ${B.user}@${B.host}`;
 
     if (act.idle > 75 && !idleSaid) { idleSaid = true; nyx.event('idle', {}, true); go('maze'); } // the screensaver kicks in
     if (act.idle < 1) idleSaid = false;
@@ -295,7 +343,7 @@
 
   // --- boot: dial in, then hand over -------------------------------------------
   function startMusic() {
-    if (B.mute || !cfg.music.on) return;
+    if (B.mute || !cfg.music.on || jukeOn()) return;
     if (!music) { music = new Techno(); music.volume(B.shot ? 0 : cfg.music.volume); } // shots exercise the synth silently
     music.start();
   }
@@ -315,7 +363,8 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   if (cfg.boot && (!B.shot || B.bootShot)) await bootSequence(); else $('boot').classList.add('gone');
-  focused.term.focus(); startMusic();
+  if (cfg.music.source === 'folder' && cfg.music.folder) juke.load(await window.gibson.musicList());
+  focused.term.focus(); if (jukeOn()) useSource('folder'); else startMusic();
   nyx.event('boot', {}, true);
 
   if (B.shot) { // headless screenshot: give it something to look at

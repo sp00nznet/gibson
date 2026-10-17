@@ -1,6 +1,7 @@
 // GIBSON main process: owns the shell (node-pty), the config file, and every
 // LLM call, so API keys never reach the renderer. Design: docs/architecture.md.
-const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, dialog, protocol, net } = require('electron');
+const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -21,7 +22,8 @@ const MUTE = argv.includes('--mute');
 const PANES = Number(arg('--panes') || 1); // start with 1-4 panes
 const UNFRAMED = argv.includes('--unframed');
 const TABS = Number(arg('--tabs') || 1); // start with this many tabs (screenshots)
-const CHAT = arg('--chat');                // shots: say this to NYX
+const CHAT = arg('--chat');
+const MUSIC = arg('--music');              // play this folder (the jukebox) instead of the synth                // shots: say this to NYX
 
 const DEFAULTS = {
   shell: process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash'),
@@ -30,13 +32,14 @@ const DEFAULTS = {
   fontSize: 15,
   framed: true,               // false: the terminal fills the window, the scene shows through
   scroller: true,             // the sine scroller along the bottom
+  logo: true,                 // the GIBSON logo bar along the top
   news: {                     // NEWSWIRE: headlines NYX can comment on. feeds: [] turns it off
     feeds: ['https://hnrss.org/frontpage', 'https://www.theregister.com/security/headlines.atom'],
     minutes: 15,
   },
   opacity: 0.86,              // terminal background: 1 solid, 0 see the world straight through
   boot: true,                 // the modem dial-in on startup
-  music: { on: true, mode: 'reactive', bpm: 128, volume: 0.55 },
+  music: { on: true, mode: 'reactive', bpm: 128, volume: 0.55, source: 'synth', folder: '', shuffle: true }, // source: synth | folder
   nyx: { on: true, voice: false, chatter: 0.35 },
   llm: {
     provider: 'ollama',       // ollama | anthropic | openai | none
@@ -83,6 +86,23 @@ const DEMO_PROCS = () => ['gibson', 'zerocool', 'acidburn', 'plague-daemon', 'da
 const DEMO_NEWS = () => ['Gibson mainframe breached by unknown worm', 'Da Vinci virus threatens oil tankers, experts say', 'Ellingson Mineral denies garbage file exists',
   'Hackers urged to stop hacking the planet', 'Phone phreaks return as modems make a comeback', 'Zero Cool banned from computers until 18th birthday']
   .map((title) => ({ title, link: '', source: 'GIBSON WIRE' }));
+
+// The jukebox's tracks: audio files under the chosen folder, three levels deep at most.
+const AUDIO = /\.(mp3|ogg|oga|opus|wav|flac|m4a|aac|webm)$/i;
+function listMusic(dir) {
+  const out = [];
+  const walk = (d, rel, depth) => {
+    let ents = []; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) {
+      if (out.length >= 5000) return;
+      const r = rel ? rel + '/' + e.name : e.name;
+      if (e.isDirectory() && depth < 3) walk(path.join(d, e.name), r, depth + 1);
+      else if (e.isFile() && AUDIO.test(e.name)) out.push(r);
+    }
+  };
+  if (dir) walk(dir, '', 0);
+  return { folder: dir, tracks: out.sort() };
+}
 
 function demoShell(c) {
   if (process.platform === 'win32') return { ...c, shellArgs: ['-NoLogo', '-NoProfile', '-NoExit', '-Command', "function prompt { 'PS C:\\GIBSON> ' }"] };
@@ -141,7 +161,9 @@ function listDir(dir) {
   } catch { return []; }
 }
 
-const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'frame', S: 'scroller' };
+// Ctrl+Shift + these keys, by key code (the shifted characters differ by keyboard layout)
+const CODEKEYS = { BracketRight: 'music:next', BracketLeft: 'music:prev', Equal: 'music:volup', Minus: 'music:voldown' };
+const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'frame', S: 'scroller', L: 'logo', P: 'music:toggle', J: 'music:source' };
 
 // Right-click menu. The page sends its current state; clicks come back as hotkey actions.
 function contextMenu(st) {
@@ -155,10 +177,24 @@ function contextMenu(st) {
     { label: 'Panes', submenu: [1, 2, 3, 4].map((n) => ({ label: `${n}`, type: 'radio', checked: n === st.panes, accelerator: `Ctrl+Shift+${n}`, registerAccelerator: false, click: act('panes:' + n) })) },
     { label: 'World', submenu: st.worlds.map(([key, label]) => ({ label, type: 'radio', checked: key === st.world, click: act('world:' + key) })) },
     { type: 'separator' },
-    item('Music', 'music', 'M', { type: 'checkbox', checked: st.music }),
+    { label: 'Music', submenu: [
+      item('On', 'music', 'M', { type: 'checkbox', checked: st.music }),
+      { type: 'separator' },
+      { label: 'Synth (follows your activity)', type: 'radio', checked: st.source === 'synth', click: act('music:synth') },
+      { label: st.folder ? `Folder: ${path.basename(st.folder)}` : 'Folder (none chosen)', type: 'radio', checked: st.source === 'folder', click: act('music:folder') },
+      { label: 'Choose music folder...', click: act('music:pick') },
+      { type: 'separator' },
+      item('Play / pause', 'music:toggle', 'P'),
+      { label: 'Next track', accelerator: 'Ctrl+Shift+]', registerAccelerator: false, click: act('music:next') },
+      { label: 'Previous track', accelerator: 'Ctrl+Shift+[', registerAccelerator: false, click: act('music:prev') },
+      { label: 'Shuffle', type: 'checkbox', checked: st.shuffle, click: act('music:shuffle') },
+      { label: 'Volume up', accelerator: 'Ctrl+Shift+=', registerAccelerator: false, click: act('music:volup') },
+      { label: 'Volume down', accelerator: 'Ctrl+Shift+-', registerAccelerator: false, click: act('music:voldown') },
+    ] },
     item('Tempo follows activity', 'tempo', 'B', { type: 'checkbox', checked: st.reactive }),
     item('Framed', 'frame', 'F', { type: 'checkbox', checked: st.framed }),
     item('Scroller', 'scroller', 'S', { type: 'checkbox', checked: st.scroller }),
+    item('Logo', 'logo', 'L', { type: 'checkbox', checked: st.logo }),
     item('NYX', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
     item('Matrix rain', 'rain', 'R'),
     { type: 'separator' },
@@ -190,6 +226,7 @@ function createWindow() {
     const k = i.key.length === 1 ? i.key.toUpperCase() : i.key;
     const digit = /^Digit([1-4])$/.exec(i.code); // Ctrl+Shift+1..4: i.key is '!' etc, so read the code
     if (digit && i.control && i.shift) { e.preventDefault(); return win.webContents.send('hotkey', 'panes:' + digit[1]); }
+    if (i.control && i.shift && CODEKEYS[i.code]) { e.preventDefault(); return win.webContents.send('hotkey', CODEKEYS[i.code]); }
     const tabKey = i.control && ((i.key === 'Tab' && (i.shift ? 'prevtab' : 'nexttab')) || (i.key === 'PageDown' && 'nexttab') || (i.key === 'PageUp' && 'prevtab'));
     if (tabKey) { e.preventDefault(); return win.webContents.send('hotkey', tabKey); }
     if (k === 'F11' || (i.control && i.shift && HOTKEYS[k])) { e.preventDefault(); win.webContents.send('hotkey', k === 'F11' ? 'fullscreen' : HOTKEYS[k]); }
@@ -210,9 +247,13 @@ function createWindow() {
   }
 }
 
+// Registered before ready: streaming lets <audio> seek in big files.
+protocol.registerSchemesAsPrivileged([{ scheme: 'gibson-music', privileges: { standard: true, secure: true, stream: true, corsEnabled: true } }]);
+
 app.whenReady().then(() => {
   cfg = loadConfig();
-  if (SHOT) { cfg = { ...demoShell(cfg), framed: true, opacity: 0.86, scroller: true }; home = demoHome(); } // shots ignore saved view choices
+  if (MUSIC) cfg.music = { ...cfg.music, source: 'folder', folder: path.resolve(MUSIC) };
+  if (SHOT) { cfg = { ...demoShell(cfg), framed: true, opacity: 0.86, scroller: true, logo: true, music: MUSIC ? cfg.music : { ...cfg.music, source: 'synth' } }; home = demoHome(); } // shots ignore saved view choices
   ipcMain.handle('boot', () => ({
     cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined } },
     user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, tabs: TABS, chat: CHAT, unframed: UNFRAMED,
@@ -225,13 +266,31 @@ app.whenReady().then(() => {
   ipcMain.on('pty:line', (_e, id, line) => { const p = panes.get(id); if (p) trackCd(p, line); });
   ipcMain.handle('fs:list', (_e, id) => { const d = (panes.get(id) || { cwd: home }).cwd; return { cwd: SHOT ? 'C:\\GIBSON' : d, entries: listDir(d) }; });
   ipcMain.on('cfg:save', (_e, key, v) => { // view choices remembered across restarts
-    if (!['opacity', 'framed', 'scroller'].includes(key)) return;
-    cfg[key] = v;
+    if (SHOT) return; // screenshots never touch the user's config
+    if (!['opacity', 'framed', 'scroller', 'logo', 'music'].includes(key)) return;
+    cfg[key] = key === 'music' ? { ...cfg.music, ...v } : v;
     try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u[key] = v; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* config unreadable: keep it for this session */ }
   });
   ipcMain.handle('git:log', (_e, id) => gitLog((panes.get(id) || { cwd: home }).cwd));
   ipcMain.handle('sys:net', () => (SHOT ? DEMO_NET() : sys.netConns()));
   ipcMain.handle('sys:procs', () => (SHOT ? DEMO_PROCS() : sys.procs()));
+  ipcMain.handle('music:list', () => listMusic(cfg.music.folder));
+  ipcMain.handle('music:pick', async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Choose a music folder', properties: ['openDirectory'], defaultPath: cfg.music.folder || app.getPath('music') });
+    if (r.canceled || !r.filePaths[0]) return null;
+    cfg.music.folder = r.filePaths[0];
+    return listMusic(cfg.music.folder);
+  });
+  // Tracks are served only from inside the chosen folder: the page never gets file:// access.
+  protocol.handle('gibson-music', (req) => {
+    const base = path.resolve(cfg.music.folder || '.'), full = path.resolve(base, decodeURIComponent(new URL(req.url).pathname).replace(/^\/+/, ''));
+    if (!cfg.music.folder || !full.startsWith(base + path.sep) || !AUDIO.test(full)) return new Response('no', { status: 403 });
+    // CORS header: without it the page counts the audio as cross-origin and WebAudio hears silence.
+    return net.fetch(pathToFileURL(full).toString(), { headers: req.headers }).then((r) => {
+      const h = new Headers(r.headers); h.set('access-control-allow-origin', '*');
+      return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
+    });
+  });
   ipcMain.on('menu', (_e, st) => contextMenu(st).popup({ window: win }));
   ipcMain.handle('nyx:llm', (_e, event) => llmLine(cfg.llm, event).catch(() => null));
   ipcMain.on('win:fullscreen', () => win.setFullScreen(!win.isFullScreen()));

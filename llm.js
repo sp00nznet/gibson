@@ -34,6 +34,7 @@ const EVENTS = {
   net: 'You noticed a new kind of network connection on their machine.',
   hog: 'A process on their machine is hogging the CPU.',
   news: 'A new headline just came in on the newswire. React to it.',
+  track: 'A new song just started on their jukebox (the detail is its file name). React to it.',
 };
 
 function describe(ev) {

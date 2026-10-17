@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' gibson-music:">
 <title>GIBSON</title>
 <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
 <link rel="stylesheet" href="style.css">
@@ -15,6 +15,11 @@
     <div id="tabs" class="solo"><button id="newtab" title="new tab (ctrl+shift+T)">+</button></div>
     <div id="termwrap"></div>
     <canvas id="scroller"></canvas>
+  </div>
+  <div id="player" class="off">
+    <button data-a="music:prev" title="previous (ctrl+shift+[)">|&lt;&lt;</button><button data-a="music:toggle" id="pp" title="play/pause (ctrl+shift+P)">&gt;||</button><button data-a="music:next" title="next (ctrl+shift+])">&gt;&gt;|</button>
+    <button data-a="music:shuffle" id="shuf" title="shuffle">SHUF</button><button data-a="music:voldown" title="volume (ctrl+shift+-)">-</button><button data-a="music:volup" title="volume (ctrl+shift+=)">+</button><button data-a="music:pick" title="choose folder">DIR</button>
+    <div id="track"></div>
   </div>
   <canvas id="rain"></canvas>
   <canvas id="smoke"></canvas>
@@ -38,6 +43,7 @@
   <script src="worlds/hive.js"></script>
   <script src="worlds/news.js"></script>
   <script src="fx.js"></script>
+  <script src="jukebox.js"></script>
   <script src="nyx.js"></script>
   <script src="app.js"></script>
 </body>
