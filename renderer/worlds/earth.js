@@ -180,13 +180,15 @@
   function makeTraffic(k) {
     const { C, env, seg, text3, setCam } = k;
     const G = { c: [0, -1, 62], R: 28, rot: 0, tilt: 0.45 };
-    const arcs = new Map(); let home = null, homeV = null;
+    const arcs = new Map(); let home = null, homeV = null, sway = 0;
     const COLS = [C.neon, C.ice, C.gold, C.violet];
     return {
       label: 'TRAFFIC MAP',
       update(dt) {
-        if (!home) { home = env.home || homeSpot(); homeV = vec(...home); G.rot = -home[1] * D + 0.6; }
-        G.rot -= dt * (0.05 + env.level * 0.15);
+        // Home stays in view: tilted to your latitude, swaying either side of your longitude.
+        if (!home) { home = env.home || homeSpot(); homeV = vec(...home); G.tilt = Math.max(-0.6, Math.min(0.6, -home[0] * D * 0.8)); }
+        sway += dt * (0.08 + env.level * 0.2);
+        G.rot = -home[1] * D + Math.sin(sway) * 0.9;
         const live = new Set();
         for (const c of env.net || []) {
           const key = c.ip + ':' + c.port; live.add(key);

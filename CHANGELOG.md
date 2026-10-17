@@ -4,6 +4,12 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-17
+
+### Fixed
+- The traffic map tilts to your latitude and sways around home instead of spinning past it, so
+  the northern hemisphere is no longer out of sight.
+
 ## [0.10.1] - 2026-10-17
 
 ### Fixed
