@@ -5,7 +5,24 @@ const require = createRequire(import.meta.url);
 const { Activity, layers, SLOW_BPM, FAST_BPM } = require('../renderer/activity.js');
 const { NYX_KIND, MOOD_WORLD, EVENT_WORLD } = require('../renderer/nyx.js');
 const { Worlds } = require('../renderer/worlds.js');
+import { readdirSync } from 'node:fs';
+for (const f of readdirSync(new URL('../renderer/worlds/', import.meta.url))) require(`../renderer/worlds/${f}`);
 const { llmLine, parse, MOODS } = require('../llm.js');
+const sysinfo = require('../sysinfo.js');
+
+// --- live data parsers, fed real-shaped output from each platform ---
+const win = '  TCP    192.168.1.5:50123      140.82.112.3:443       ESTABLISHED     4242\n  TCP    127.0.0.1:5000         127.0.0.1:5001         ESTABLISHED     1\n  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING       900\n  TCP    [::1]:7000             [::1]:7001             ESTABLISHED     2\n  TCP    [2001:db8::5]:50200    [2606:4700::6810]:443  ESTABLISHED     7\n';
+assert.deepEqual(sysinfo.parseNet(win).map((c) => `${c.ip}:${c.port}:${c.service}`), ['140.82.112.3:443:https', '2606:4700::6810:443:https'], 'Windows netstat: established, not loopback');
+const mac = 'tcp4       0      0  192.168.1.5.50124      203.0.113.9.22         ESTABLISHED 131072 131072  77  0 0x0102\n';
+assert.equal(sysinfo.parseNet(mac)[0].service, 'ssh', 'macOS netstat uses dots before the port');
+const lin = 'ESTAB 0 0 10.0.0.2:41234 198.51.100.7:6697\n';
+assert.equal(sysinfo.parseNet(lin)[0].port, 6697, 'Linux ss');
+const ps = sysinfo.parseProcs('/usr/bin/zsh  0.5  4096\n/Applications/Google Chrome.app/Contents/MacOS/Google Chrome  12.0  204800\nzsh  1.0 2048\n', false, 0);
+assert.deepEqual(ps.map((p) => [p.name, p.cpu, p.n]), [['Google Chrome', 12, 1], ['zsh', 1.5, 2]], 'ps: names with spaces, grouped by name');
+const rss = '<rss><channel><title>Wire</title><item><title><![CDATA[Worm &amp; virus]]></title><link>https://x/1</link></item><item><title>Second</title></item></channel></rss>';
+assert.deepEqual(sysinfo.parseFeed(rss).map((i) => [i.title, i.source]), [['Worm & virus', 'Wire'], ['Second', 'Wire']], 'RSS');
+const atom = '<feed><title>Reg</title><entry><title type="html">Patch &#8217;em</title><link href="https://y/2"/></entry></feed>';
+assert.deepEqual(sysinfo.parseFeed(atom)[0], { title: 'Patch \u2019em', link: 'https://y/2', source: 'Reg' }, 'Atom');
 
 // --- tempo follows the hands ---
 const a = new Activity();

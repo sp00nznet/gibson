@@ -7,6 +7,7 @@ const os = require('os');
 const pty = require('node-pty');
 const { execFile } = require('child_process');
 const { llmLine } = require('./llm');
+const sys = require('./sysinfo');
 
 // One config folder for source runs and packaged builds (whose app name is GIBSON).
 app.setPath('userData', path.join(app.getPath('appData'), 'gibson'));
@@ -29,6 +30,10 @@ const DEFAULTS = {
   fontSize: 15,
   framed: true,               // false: the terminal fills the window, the scene shows through
   scroller: true,             // the sine scroller along the bottom
+  news: {                     // NEWSWIRE: headlines NYX can comment on. feeds: [] turns it off
+    feeds: ['https://hnrss.org/frontpage', 'https://www.theregister.com/security/headlines.atom'],
+    minutes: 15,
+  },
   opacity: 0.86,              // terminal background: 1 solid, 0 see the world straight through
   boot: true,                 // the modem dial-in on startup
   music: { on: true, mode: 'reactive', bpm: 128, volume: 0.55 },
@@ -49,7 +54,7 @@ function loadConfig() {
   try { user = JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(DEFAULTS, null, 2)); }
   const cfg = { ...DEFAULTS, ...user };
-  for (const k of ['music', 'nyx', 'llm']) cfg[k] = { ...DEFAULTS[k], ...(user[k] || {}) };
+  for (const k of ['music', 'nyx', 'llm', 'news']) cfg[k] = { ...DEFAULTS[k], ...(user[k] || {}) };
   cfg.file = file;
   return cfg;
 }
@@ -70,6 +75,15 @@ function demoHome() {
   for (const [f, n] of DEMO.files) fs.writeFileSync(path.join(dir, f), Buffer.alloc(n, 0x2e));
   return dir;
 }
+// Made-up live data for shot mode.
+const DEMO_NET = () => [['198.51.100.7', 443], ['203.0.113.42', 22], ['192.0.2.80', 443], ['198.51.100.23', 6697], ['203.0.113.9', 993],
+  ['192.0.2.14', 80], ['198.51.100.99', 443], ['203.0.113.77', 5228], ['192.0.2.200', 9418]].map(([ip, port]) => ({ ip, port, service: sys.SERVICES[port] || `port ${port}` }));
+const DEMO_PROCS = () => ['gibson', 'zerocool', 'acidburn', 'plague-daemon', 'da-vinci', 'worm', 'kernel-sentry', 'ellingson-sync', 'phreak', 'cereal', 'nikon', 'garbage-collector', 'modem', 'bbs-door']
+  .map((name, i) => ({ name, cpu: i === 4 ? 92 : Math.random() * 12, mem: (14 - i) * 40e6 + Math.random() * 20e6, n: 1 + (i % 3) }));
+const DEMO_NEWS = () => ['Gibson mainframe breached by unknown worm', 'Da Vinci virus threatens oil tankers, experts say', 'Ellingson Mineral denies garbage file exists',
+  'Hackers urged to stop hacking the planet', 'Phone phreaks return as modems make a comeback', 'Zero Cool banned from computers until 18th birthday']
+  .map((title) => ({ title, link: '', source: 'GIBSON WIRE' }));
+
 function demoShell(c) {
   if (process.platform === 'win32') return { ...c, shellArgs: ['-NoLogo', '-NoProfile', '-NoExit', '-Command', "function prompt { 'PS C:\\GIBSON> ' }"] };
   return { ...c, shell: 'bash', shellArgs: ['--norc', '--noprofile'] };
@@ -216,9 +230,20 @@ app.whenReady().then(() => {
     try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u[key] = v; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* config unreadable: keep it for this session */ }
   });
   ipcMain.handle('git:log', (_e, id) => gitLog((panes.get(id) || { cwd: home }).cwd));
+  ipcMain.handle('sys:net', () => (SHOT ? DEMO_NET() : sys.netConns()));
+  ipcMain.handle('sys:procs', () => (SHOT ? DEMO_PROCS() : sys.procs()));
   ipcMain.on('menu', (_e, st) => contextMenu(st).popup({ window: win }));
   ipcMain.handle('nyx:llm', (_e, event) => llmLine(cfg.llm, event).catch(() => null));
   ipcMain.on('win:fullscreen', () => win.setFullScreen(!win.isFullScreen()));
+  // NEWSWIRE: fetch the feeds now and every news.minutes, push headlines to the page.
+  const pushNews = async () => {
+    const items = SHOT ? DEMO_NEWS() : await sys.fetchFeeds(cfg.news.feeds);
+    if (items.length && win && !win.isDestroyed()) win.webContents.send('news', items);
+  };
+  if (SHOT || (cfg.news.feeds || []).length) {
+    setTimeout(pushNews, SHOT ? 1500 : 8000);
+    if (!SHOT) setInterval(pushNews, Math.max(5, cfg.news.minutes || 15) * 60000);
+  }
   Menu.setApplicationMenu(null); // the default menu's accelerators (Ctrl+Shift+R = reload) fight ours
   createWindow();
 });

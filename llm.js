@@ -31,6 +31,9 @@ const EVENTS = {
   done: 'The long build just finished.',
   late: 'It is the middle of the night and the hacker is still working.',
   chat: 'The hacker typed a message to you directly in the terminal.',
+  net: 'You noticed a new kind of network connection on their machine.',
+  hog: 'A process on their machine is hogging the CPU.',
+  news: 'A new headline just came in on the newswire. React to it.',
 };
 
 function describe(ev) {
@@ -38,6 +41,8 @@ function describe(ev) {
   if (ev.cmd) bits.push(`command: ${ev.cmd.slice(0, 200)}`);
   if (ev.cwd) bits.push(`directory: ${ev.cwd}`);
   if (ev.output) bits.push(`recent output:\n${ev.output.slice(-600)}`);
+  if (ev.headline) bits.push(`headline: "${String(ev.headline).slice(0, 200)}"`);
+  if (ev.detail) bits.push(`detail: ${String(ev.detail).slice(0, 200)}`);
   if (ev.message) bits.push(`they say to you: "${String(ev.message).slice(0, 500)}"`);
   return bits.join('\n');
 }

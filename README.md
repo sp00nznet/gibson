@@ -2,14 +2,15 @@
 
 A cracktro you can work in. A real terminal sits in the middle of the screen, framed by
 wireframe worlds: your own filesystem as a Hackers-style city, your git history as a galaxy, the
-Gibson mainframe, a 90s BBS, a rave, black ICE, space battles, a night highway and more. A synthesized techno/industrial soundtrack speeds up when you work
+Gibson mainframe, your live network connections, your running programs, a news ticker, a 90s
+BBS, light cycles, Battlezone, the 3D Pipes and Maze screensavers, a rave, black ICE and more. A synthesized techno/industrial soundtrack speeds up when you work
 hard and settles down when you stop. Watching it all is **NYX**, the unseen sysop: she greets
 you, needles you about typos, roots for you anyway, and changes the world behind the terminal to
 suit her mood. A local or hosted LLM can write her lines; without one she has her own.
 
 ## Status
 
-**0.4.1, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
+**0.5.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
 builds are produced and smoke-tested by CI, but nobody has used them day to day yet.
 
 | | |
@@ -17,7 +18,7 @@ builds are produced and smoke-tested by CI, but nobody has used them day to day 
 | Real shell (node-pty), xterm.js 6 with WebGL, links, Unicode 11 | done |
 | Tabs, each with 1 to 4 tiled panes; per-pane opacity; framed or full-window view | done |
 | Talk to NYX from any pane: `nyx <message>` | done |
-| Thirteen wireframe worlds, ships flying through, data packets zipping by | done |
+| Twenty-one wireframe worlds, three of them from live system data and one from RSS | done |
 | Reactive soundtrack: kick, bass, acid line, distorted guitar chugs, pad; 84 to 162 BPM | done |
 | Modem dial-in on startup (DTMF, answer tone, handshake) | done |
 | NYX: canned personality, moods pick worlds, optional voice | done |
@@ -49,6 +50,18 @@ From the app itself, captured headless (`npm run shots`) in a made-up demo folde
 
 ![Black ICE: a lattice wall](docs/screenshots/ice.png)
 *ICE WALL: flares red on an error, cracks open when the next command works.*
+
+![Live connections as arcs from a globe to labelled nodes](docs/screenshots/net.png)
+*NETWATCH: your machine's live TCP connections (made-up addresses in this capture).*
+
+![Headlines crawling across LED ticker bands](docs/screenshots/news.png)
+*NEWSWIRE: your RSS feeds on ticker bands. NYX comments on fresh headlines.*
+
+![Light cycles racing on a grid, trails as walls](docs/screenshots/cycles.png)
+*LIGHT CYCLES: six riders, one arena, a scoreboard of who got derezzed.*
+
+![Vector tank battle with a radar scope](docs/screenshots/battlezone.png)
+*BATTLEZONE: green vectors, a volcano and a radar sweep in the corner.*
 
 ![Space battle behind the terminal](docs/screenshots/battle.png)
 *DEEP SPACE: two fleets trading lasers, a capital ship sliding past.*
@@ -103,7 +116,7 @@ python3`). Optional: [Ollama](https://ollama.com) for NYX's local brain.
    ```
    Expected output:
    ```
-   > gibson@0.4.1 test
+   > gibson@0.5.0 test
    > node test/check.mjs
 
    check: all passed
@@ -164,9 +177,14 @@ Worlds change with NYX's mood and with what you do:
 | ICE WALL | an error (it cracks open when the next command works) |
 | GIBSON CORE | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
 | RAVE WAREHOUSE | a typing streak (speakers and the crowd move on the kick) |
-| DATASTREAM | a long build |
-| HIGHWAY | you go idle, or NYX is bored |
-| DEEP SEA, ORBIT, NEON CITY, DEEP SPACE, THE GRID | NYX's other moods |
+| 3D PIPES | a long build (the screensaver while you wait) |
+| 3D MAZE | you go idle (the screensaver kicks in) |
+| NETWATCH | a kind of connection you haven't made this session (live: `netstat` / `ss`) |
+| PROCESS HIVE | a program hogging the CPU (live: one cell per program, height is memory, heat is CPU) |
+| NEWSWIRE | a fresh headline on your RSS feeds |
+| LIGHT CYCLES | NYX feeling playful |
+| HIGHWAY, DEEP SEA, NEON CITY, DEEP SPACE, THE GRID | NYX's other moods |
+| DATASTREAM, ORBIT, THE STREET, BATTLEZONE | the menu or `Ctrl+Shift+W` |
 
 `Ctrl+Shift+W` steps through them and the right-click menu picks one.
 
@@ -188,6 +206,7 @@ Settings live in `config.json`, created on first run (restart to apply):
   "boot": true,
   "framed": true,
   "scroller": true,
+  "news":  { "feeds": ["https://hnrss.org/frontpage", "https://www.theregister.com/security/headlines.atom"], "minutes": 15 },
   "opacity": 0.86,
   "music": { "on": true, "mode": "reactive", "bpm": 128, "volume": 0.55 },
   "nyx":   { "on": true, "voice": false, "chatter": 0.35 },
@@ -205,6 +224,8 @@ Settings live in `config.json`, created on first run (restart to apply):
   vLLM or any OpenAI-compatible server), or `none` for canned lines only.
 - `llm.shareOutput`: also send the last bit of terminal output. Off by default; see
   [SECURITY.md](SECURITY.md).
+- `news.feeds`: any RSS or Atom URLs, fetched every `news.minutes`. `[]` turns the newswire off
+  (nothing is fetched).
 
 Headless screenshot (no window opens, so it works over RDP):
 
@@ -213,7 +234,8 @@ npx electron . --shot out.png --world battle --panes 2 --unframed --at 8
 ```
 
 `--world` is one of `grid`, `city`, `files`, `battle`, `planet`, `tunnel`, `core`, `bbs`, `rave`,
-`git`, `ice`, `highway`, `sea`; `--tabs 3` opens three
+`git`, `ice`, `highway`, `sea`, `pipes`, `maze`, `cycles`, `battlezone`, `street`, `net`,
+`hive`, `news`; `--tabs 3` opens three
 tabs and `--chat "are you real?"` types `nyx are you real?` into the first pane. Shot mode runs the
 shells in a made-up folder as `hacker@gibson`, so a capture never shows your machine.
 `npm run shots` regenerates everything in `docs/screenshots/`.

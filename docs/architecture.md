@@ -102,7 +102,11 @@ Which world shows: an event's own world if it has one (`EVENT_WORLD` in `nyx.js`
 error, danger, ssh, streak, compile), otherwise the world for NYX's mood (`MOOD_WORLD`). The
 self-check asserts every world those maps name exists.
 
-Two worlds read real data, passed in through `env` by `app.js`:
+Worlds in their own files (`renderer/worlds/*.js`) register with `Worlds.define(name, kit =>
+world)`; `kit` is the projector, the line batcher, the colours and `env`. Each file also loads
+under Node (`require('../worlds.js')`) so the self-check can see every world.
+
+Five worlds read real data, passed in through `env` by `app.js`:
 
 - FILESYSTEM: `fs:list` for the focused pane's folder.
 - GIT GALAXY: `git:log` in `main.js` runs `git log --all --topo-order -n 150` in the focused
@@ -112,6 +116,19 @@ Two worlds read real data, passed in through `env` by `app.js`:
   parents get free lanes. Each lane is a spiral arm; radius and angle both grow with the square
   root of a commit's age, which spaces commits evenly along the arm. The log is re-read on focus,
   `cd`, and 1.2 s after any `git` command, and commits not seen before ignite.
+
+- NETWATCH, PROCESS HIVE, NEWSWIRE: `sysinfo.js` in the main process. Connections come from
+  `netstat -no` (Windows), `netstat -anv -p tcp` (macOS) or `ss -tnH` (Linux); established,
+  non-loopback peers only. Programs come from `Get-Process` (Windows, CPU seconds, so the
+  percentage is the change between polls) or `ps -axo comm=,%cpu=,rss=`, grouped by name, top
+  48 by memory. Both are polled every 3 s while their world shows and every 20-30 s otherwise,
+  so NYX can still react. Feeds are RSS or Atom parsed with a few regular expressions (a title
+  list does not need an XML library), fetched by main and pushed to the page.
+  The parsers are separate from the commands and the self-check feeds them sample output from
+  each platform.
+
+NEWSWIRE wipes each ticker band to black before drawing its text: text that moves across the
+world's fading trails otherwise smears into an unreadable double image.
 
 `Worlds.signal(kind)` passes events to any world with a `signal` handler. `app.js` sends
 `error` when a command's output looks like an error and `ok` 1.5 s after a command that did not;

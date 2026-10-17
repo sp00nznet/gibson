@@ -1,6 +1,6 @@
 {
   "name": "gibson",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "GIBSON: a cracktro terminal. Wireframe worlds, reactive techno, and NYX, the unseen sysop who watches you type.",
   "author": "sp00nznet",
   "license": "MIT",
@@ -36,6 +36,7 @@
     "files": [
       "main.js",
       "llm.js",
+      "sysinfo.js",
       "preload.js",
       "renderer/**",
       "LICENSE",

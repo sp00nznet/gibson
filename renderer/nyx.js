@@ -3,9 +3,9 @@
 // below are the whole personality when no LLM is configured; with one, the model
 // writes the line and these are the fallback.
 (function (root) {
-  const MOOD_WORLD = { welcoming: 'grid', tender: 'sea', curious: 'files', playful: 'planet', taunting: 'battle', impressed: 'city', bored: 'highway', intense: 'core' };
+  const MOOD_WORLD = { welcoming: 'grid', tender: 'sea', curious: 'files', playful: 'cycles', taunting: 'battle', impressed: 'city', bored: 'highway', intense: 'core' };
   // Some events have a world of their own, whatever her mood.
-  const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: 'core', ssh: 'core', streak: 'rave', compile: 'tunnel' };
+  const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: 'core', ssh: 'core', streak: 'rave', compile: 'pipes', net: 'net', hog: 'hive', news: 'news' };
 
   const LINES = {
     boot: [
@@ -47,6 +47,9 @@
       ['tender', 'I am listening. I am always listening.'], ['bored', 'Mm-hm. Fascinating. Back to work.'],
       ['curious', 'Ask me again when the build passes.'], ['playful', 'You talk to your terminal now? Good. So do I.'],
     ],
+    net: [['curious', 'Something new just opened a line out. I am watching it.'], ['intense', 'New connection. Friend of yours?'], ['playful', 'Packets, packets everywhere.']],
+    hog: [['taunting', 'Something is eating your CPU alive. Not my problem. Mostly.'], ['intense', 'Runaway process. The hive is buzzing.'], ['bored', 'One process hogging everything. Typical.']],
+    news: [['curious', 'Fresh off the wire. Read it before they take it down.'], ['taunting', 'The world keeps breaking things. You are in good company.'], ['playful', 'Breaking news: you still have not committed.']],
     late: [['tender', 'It is late, hacker. The best exploits are written at this hour.'], ['taunting', 'Still awake? Your sleep schedule is a vulnerability.']],
   };
 

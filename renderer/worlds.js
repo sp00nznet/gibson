@@ -1,6 +1,7 @@
 // The worlds behind the terminal. Everything is line segments through one
 // perspective projector, drawn additively over a fading canvas so motion leaves
-// trails. A world is { enter(), update(dt, e), draw(e) }; NYX picks which one.
+// trails. A world is { label, update(dt), draw(), enter?(), signal?(kind) }; NYX picks which one.
+// More worlds live in renderer/worlds/*.js and register with Worlds.define(name, kit => world).
 (function (root) {
   const C = { neon: '57,255,156', hot: '255,46,136', ice: '54,214,255', gold: '255,196,72', violet: '168,96,255', white: '230,240,255' };
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -619,8 +620,15 @@
     requestAnimationFrame(frame);
   }
 
+  // What a world in its own file gets to draw with. W, H, F and g change on resize, hence getters.
+  const kit = {
+    C, rand, pick, hex, env, seg, line2, text3, box, ring, ship, setCam, lookAt, toCam,
+    get W() { return W; }, get H() { return H; }, get F() { return F; }, get g() { return g; },
+  };
+
   root.Worlds = {
-    names: Object.keys(worlds),
+    get names() { return Object.keys(worlds); },
+    define(name, make) { worlds[name] = make(kit); },
     label: (name) => worlds[name || cur].label,
     current: () => cur,
     go(name) {

@@ -6,7 +6,7 @@
   const cfg = B.cfg;
   const $ = (id) => document.getElementById(id);
   const act = new Activity();
-  const worldEnv = { fs: null, git: null };
+  const worldEnv = { fs: null, git: null, net: null, procs: null, news: null };
   const refreshGit = (p) => window.gibson.gitLog(p.id).then((g) => { worldEnv.git = g; });
   const go = (w) => { if (!B.world) Worlds.go(w); };
   let music = null, pulse = 0, warp = 0;
@@ -196,7 +196,33 @@
 
   // --- worlds + fx ------------------------------------------------------------
   worldEnv.fs = await window.gibson.listDir(focused.id);
-  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git }));
+  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news }));
+
+  // --- live data: polled fast while its world is showing, slowly otherwise, so NYX can react ---
+  const services = new Set(), hogs = new Map(), titles = new Set();
+  let netAt = 0, procAt = 0;
+  setInterval(async () => {
+    const now = Date.now(), w = Worlds.current();
+    if (now - netAt > (w === 'net' ? 3000 : 20000)) {
+      netAt = now; const first = !worldEnv.net; worldEnv.net = await window.gibson.net();
+      for (const c of worldEnv.net) if (!services.has(c.service)) { // a kind of connection not seen this session
+        services.add(c.service); if (!first) nyx.event('net', { detail: `a new connection to ${c.service}` }, false);
+      }
+    }
+    if (now - procAt > (w === 'hive' ? 3000 : 30000)) {
+      procAt = now; worldEnv.procs = await window.gibson.procs();
+      for (const p of worldEnv.procs) { // two hot polls in a row is a hog, said once per process
+        const n = p.cpu > 80 ? (hogs.get(p.name) || 0) + 1 : 0; hogs.set(p.name, n);
+        if (n === 2) nyx.event('hog', { detail: `${p.name} is using ${Math.round(p.cpu)}% CPU` }, false);
+      }
+    }
+  }, 1000);
+  window.gibson.onNews((items) => {
+    const fresh = items.filter((i) => !titles.has(i.title)), first = !worldEnv.news;
+    for (const i of items) titles.add(i.title);
+    worldEnv.news = items;
+    if (!first && fresh.length) { Worlds.signal('news'); nyx.event('news', { headline: fresh[0].title, detail: fresh[0].source }, false); }
+  });
   if (B.world) Worlds.go(B.world);
   Fx.start({ logo: $('logo'), scroller: $('scroller'), rain: $('rain'), smoke: $('smoke') },
     () => ({ pulse, level: act.level(), smoking: act.busyOut > 4, scroll }));
@@ -257,9 +283,9 @@
     const fr = $('frame').style; fr.setProperty('--glow', pulse.toFixed(3)); fr.setProperty('--warp', warp.toFixed(3));
     $('status').textContent = `${Math.round(act.bpm)} BPM  ${'▮'.repeat(Math.round(lvl * 10)).padEnd(10, '▯')}\n${Worlds.label()}  //  ${B.user}@${B.host}`;
 
-    if (act.idle > 75 && !idleSaid) { idleSaid = true; nyx.event('idle', {}, true); go('highway'); }
+    if (act.idle > 75 && !idleSaid) { idleSaid = true; nyx.event('idle', {}, true); go('maze'); } // the screensaver kicks in
     if (act.idle < 1) idleSaid = false;
-    if (act.busyOut > 4 && !compileSaid) { compileSaid = true; nyx.event('compile', { cmd: focused.lastCmd }, true); go('tunnel'); }
+    if (act.busyOut > 4 && !compileSaid) { compileSaid = true; nyx.event('compile', { cmd: focused.lastCmd }, true); go('pipes'); }
     if (compileSaid && act.busyOut === 0) { compileSaid = false; nyx.event('done', { cmd: focused.lastCmd, output: focused.outTail }, true); }
     if (lvl > 0.85 && now - streakAt > 60000) { streakAt = now; nyx.event('streak', {}, false); }
     const h = new Date().getHours();

@@ -14,6 +14,15 @@ machine, and where keys live:
   put in `config.json` (see the README for its path on each system) is stored in plain text. Keys stay in
   the main process; the page never receives them (`main.js` strips `apiKey` before handing
   the config over).
+- **NETWATCH and PROCESS HIVE** run `netstat` / `ss` and `ps` / `Get-Process` locally. Addresses
+  and program names are drawn on your screen and go nowhere else, except that NYX is told the
+  *service* of a new kind of connection ("https", "ssh", never the address) and the name of a
+  program hogging the CPU. With a hosted model, those words leave the machine.
+- **NEWSWIRE** fetches the RSS/Atom URLs in `news.feeds` every `news.minutes` (default: Hacker
+  News and The Register's security feed). Those requests carry nothing about you beyond what
+  any feed reader sends. `"feeds": []` stops them. Headlines are passed to NYX.
+- **Screenshots** (`--shot`) never show the machine they run on: a made-up folder, user,
+  connections, programs and headlines.
 - **The page.** Context isolation is on, Node integration is off, and the page's only
   capabilities are the ones in `preload.js`. A Content-Security-Policy blocks remote scripts.
   Links clicked in the terminal open in your default browser, not in GIBSON.

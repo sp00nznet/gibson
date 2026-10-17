@@ -4,6 +4,22 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-17
+
+### Added
+- Eight worlds: NETWATCH (live TCP connections as arcs from a globe), PROCESS HIVE (running
+  programs as a honeycomb, memory as height, CPU as heat), NEWSWIRE (RSS/Atom headlines on
+  ticker bands), 3D PIPES and 3D MAZE (the old screensavers), LIGHT CYCLES, BATTLEZONE (vector
+  tanks, a radar scope) and THE STREET (a Snow Crash boulevard).
+- NYX reacts to live data: a kind of connection not seen this session, a program hogging the
+  CPU, a fresh headline.
+- `news.feeds` and `news.minutes` in `config.json`.
+- `Worlds.define()`: a world can live in its own file under `renderer/worlds/`.
+
+### Changed
+- Going idle shows the 3D MAZE and a long build shows 3D PIPES; NYX's playful mood rides the
+  light cycles.
+
 ## [0.4.1] - 2026-10-17
 
 ### Added

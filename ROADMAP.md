@@ -9,6 +9,7 @@
 - Day-to-day use on Linux and macOS (CI builds and self-checks them; nobody has lived in them yet).
 
 ## Ideas
+- Click a NEWSWIRE headline to open it; NETWATCH hostnames via reverse DNS.
 - NYX remembers across sessions (what you broke last time, how late you stayed).
 - More worlds: a BBS lobby, a Gibson mainframe core, a rave warehouse.
 - Song sections that follow what you are doing (a breakdown while you read, a drop on a
