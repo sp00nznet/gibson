@@ -73,10 +73,16 @@ process tracks the working directory from the `cd` lines this produces, for the 
 ## Talking to NYX
 
 `nyx <message>` is caught in `app.js` when Enter arrives on a typed line that starts with `nyx`.
-The line is cancelled in the shell with Ctrl+C rather than sent, and NYX's answer is shown in an
+The line is erased in the shell with one backspace per character rather than sent, and NYX's
+answer is shown in an
 overlay on the pane, not written into the terminal. Why: on Windows the shell sits behind ConPTY,
 which keeps its own copy of the screen and repaints from it; text that xterm.js shows without
 ConPTY knowing gets overwritten on its next redraw.
+
+Why backspaces: Ctrl+C was the first try, and PowerShell echoes it as `^C` after the line.
+Backspace (0x7f) means the same thing in PowerShell, cmd, bash and zsh, where Escape (clears
+the line in PowerShell) is a meta prefix in bash and Ctrl+U does nothing in PowerShell's
+Windows mode. The count comes from the untrimmed screen text, so trailing spaces go too.
 
 A chat skips the chatter roll and the `minGapSec` rate limit, and sends the last eight turns
 as real user/assistant messages (`llm.js` drops a leading assistant turn, since the Messages API

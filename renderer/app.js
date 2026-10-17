@@ -76,9 +76,13 @@
     term.onData((d) => {
       act.key(d[0] === '\x7f' || d[0] === '\x1b' ? 0.1 : 1); // backspace and arrows aren't a frenzy
       const enter = d === '\r' || d === '\n';
-      const cmd = enter ? typedLine(p) || p.line.trim() : '';
+      const shown = enter ? typedLine(p) : null;
+      const raw = shown && shown.trim() ? shown : enter ? p.line : '';
+      const cmd = raw.trim();
       if (enter && /^nyx(\s|$)/i.test(cmd)) { // `nyx <message>` is for her, not the shell
-        window.gibson.write(id, '\x03');       // cancel the line in the shell
+        // Erase the line with backspaces rather than Ctrl+C, which leaves a ^C behind.
+        // Backspace means the same in PowerShell, cmd, bash and zsh.
+        window.gibson.write(id, '\x7f'.repeat(raw.length));
         nyxChat(p, cmd.slice(3).trim()); p.line = '';
         return;
       }
@@ -94,14 +98,15 @@
   }
   // The command line as the screen shows it: the cursor's row plus any rows it wrapped from,
   // up to the cursor (PSReadLine draws its grey predictions to the right of it). The prompt
-  // ends at its first > $ # or % plus a space. null when no prompt is recognised.
+  // ends at its first > $ # or % plus a space. Untrimmed, so its length is what the shell
+  // holds. null when no prompt is recognised.
   // ponytail: prompt-shape heuristic; a prompt hook (OSC 133) would be exact.
   function typedLine(p) {
     const b = p.term.buffer.active;
-    let y = b.baseY + b.cursorY, text = b.getLine(y).translateToString(true, 0, b.cursorX);
+    let y = b.baseY + b.cursorY, text = b.getLine(y).translateToString(false, 0, b.cursorX);
     while (y > 0 && b.getLine(y).isWrapped) { y--; text = b.getLine(y).translateToString(false) + text; }
     const m = /^[^>$#%]*[>$#%] (.*)$/.exec(text);
-    return m ? m[1].trim() : null;
+    return m ? m[1] : null;
   }
   function closePane(p) {
     p.ro.disconnect(); p.term.dispose(); p.el.remove(); window.gibson.close(p.id);

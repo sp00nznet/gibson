@@ -4,6 +4,13 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-17
+
+### Fixed
+- `nyx <message>` left a `^C` after the line in PowerShell. The line is now erased with
+  backspaces instead of cancelled, so the prompt stays clean; the conversation shows in the
+  overlay and NYX's bar.
+
 ## [0.3.1] - 2026-10-17
 
 ### Fixed

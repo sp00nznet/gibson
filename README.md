@@ -9,7 +9,7 @@ suit her mood. A local or hosted LLM can write her lines; without one she has he
 
 ## Status
 
-**0.3.1, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
+**0.3.2, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
 builds are produced and smoke-tested by CI, but nobody has used them day to day yet.
 
 | | |
@@ -94,7 +94,7 @@ python3`). Optional: [Ollama](https://ollama.com) for NYX's local brain.
    ```
    Expected output:
    ```
-   > gibson@0.3.1 test
+   > gibson@0.3.2 test
    > node test/check.mjs
 
    check: all passed
@@ -124,7 +124,7 @@ Trip-ups:
 
 | Key | Does |
 |---|---|
-| `nyx <message>` | type it in any pane and press Enter: NYX answers you (the shell never sees the line) |
+| `nyx <message>` | type it (or recall it with Up) in any pane and press Enter: NYX answers you; the shell never runs it |
 | `Ctrl+Shift+T` / `Ctrl+Shift+X` | new tab / close tab (or the `+` button; middle-click a tab to close it) |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | next / previous tab (also `Ctrl+PageDown` / `Ctrl+PageUp`) |
 | `Ctrl+Shift+1`..`4` | that many panes in this tab, each its own shell. Shrinking keeps the focused pane |
