@@ -92,7 +92,7 @@
       if (Math.abs(flyby.x) > 70) { flyby = null; flyT = rand(3, 9) / (0.5 + env.level); }
     }
     // data packets zipping across the margins, in screen space
-    if (Math.random() < dt * (1.5 + env.level * 10)) packets.push({ x: Math.random() < 0.5 ? -200 : W + 200, y: rand(0, H), v: 0, s: `${hex(4)}:${hex(4)} >> ${(Math.random() * 255) | 0}.${(Math.random() * 255) | 0}.0.${(Math.random() * 255) | 0}`, col: pick([C.neon, C.ice, C.hot]) });
+    if (env.packets !== false && Math.random() < dt * (1.5 + env.level * 10)) packets.push({ x: Math.random() < 0.5 ? -200 : W + 200, y: rand(0, H), v: 0, s: `${hex(4)}:${hex(4)} >> ${(Math.random() * 255) | 0}.${(Math.random() * 255) | 0}.0.${(Math.random() * 255) | 0}`, col: pick([C.neon, C.ice, C.hot]) });
     g.font = "11px 'Cascadia Mono', Consolas, monospace";
     for (const p of packets) {
       if (!p.v) p.v = (p.x < 0 ? 1 : -1) * rand(500, 1400) * (0.6 + env.level);
@@ -596,7 +596,7 @@
   })();
 
   // --- engine ----------------------------------------------------------------
-  const env = { t: 0, speed: 10, level: 0, pulse: 0, warp: 0, bright: 1, fs: null, git: null };
+  const env = { t: 0, speed: 10, level: 0, pulse: 0, warp: 0, bright: 1, fs: null, git: null, packets: true };
   let cur = 'grid', prev = null, trans = 1, last = 0, source = () => ({});
 
   function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; F = H * 0.9; }

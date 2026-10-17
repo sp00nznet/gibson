@@ -33,6 +33,7 @@ const DEFAULTS = {
   framed: true,               // false: the terminal fills the window, the scene shows through
   scroller: true,             // the sine scroller along the bottom
   logo: true,                 // the GIBSON logo bar along the top
+  packets: true,              // the data packets streaming in from the sides
   news: {                     // NEWSWIRE: headlines NYX can comment on. feeds: [] turns it off
     feeds: ['https://hnrss.org/frontpage', 'https://www.theregister.com/security/headlines.atom'],
     minutes: 15,
@@ -163,7 +164,7 @@ function listDir(dir) {
 
 // Ctrl+Shift + these keys, by key code (the shifted characters differ by keyboard layout)
 const CODEKEYS = { BracketRight: 'music:next', BracketLeft: 'music:prev', Equal: 'music:volup', Minus: 'music:voldown' };
-const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'frame', S: 'scroller', L: 'logo', P: 'music:toggle', J: 'music:source' };
+const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'frame', S: 'scroller', L: 'logo', D: 'packets', P: 'music:toggle', J: 'music:source' };
 
 // Right-click menu. The page sends its current state; clicks come back as hotkey actions.
 function contextMenu(st) {
@@ -195,6 +196,7 @@ function contextMenu(st) {
     item('Framed', 'frame', 'F', { type: 'checkbox', checked: st.framed }),
     item('Scroller', 'scroller', 'S', { type: 'checkbox', checked: st.scroller }),
     item('Logo', 'logo', 'L', { type: 'checkbox', checked: st.logo }),
+    item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
     item('NYX', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
     item('Matrix rain', 'rain', 'R'),
     { type: 'separator' },
@@ -267,7 +269,7 @@ app.whenReady().then(() => {
   ipcMain.handle('fs:list', (_e, id) => { const d = (panes.get(id) || { cwd: home }).cwd; return { cwd: SHOT ? 'C:\\GIBSON' : d, entries: listDir(d) }; });
   ipcMain.on('cfg:save', (_e, key, v) => { // view choices remembered across restarts
     if (SHOT) return; // screenshots never touch the user's config
-    if (!['opacity', 'framed', 'scroller', 'logo', 'music'].includes(key)) return;
+    if (!['opacity', 'framed', 'scroller', 'logo', 'packets', 'music'].includes(key)) return;
     cfg[key] = key === 'music' ? { ...cfg.music, ...v } : v;
     try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u[key] = v; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* config unreadable: keep it for this session */ }
   });

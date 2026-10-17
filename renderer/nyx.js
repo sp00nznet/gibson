@@ -3,7 +3,7 @@
 // below are the whole personality when no LLM is configured; with one, the model
 // writes the line and these are the fallback.
 (function (root) {
-  const MOOD_WORLD = { welcoming: 'grid', tender: 'sea', curious: 'files', playful: 'cycles', taunting: 'battle', impressed: 'city', bored: 'highway', intense: 'core' };
+  const MOOD_WORLD = { welcoming: 'grid', tender: 'toasters', curious: 'files', playful: 'cycles', taunting: 'battle', impressed: 'city', bored: 'highway', intense: 'core' };
   // Some events have a world of their own, whatever her mood.
   const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: 'core', ssh: 'core', streak: 'rave', compile: 'pipes', net: 'net', hog: 'hive', news: 'news' };
 

@@ -4,6 +4,14 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-17
+
+### Added
+- FLYING TOASTERS: wireframe toasters flapping across the screen among slices of toast (some
+  burnt), a homage to the 90s screensaver. NYX's tender mood sends you there.
+- `Ctrl+Shift+D` (or the menu) hides the data packets streaming in from the sides. Remembered as
+  `packets`.
+
 ## [0.6.0] - 2026-10-17
 
 ### Added

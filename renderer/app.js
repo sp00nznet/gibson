@@ -175,7 +175,7 @@
   if (B.tabs > 1) switchTab(tabs[0]);
 
   // --- NYX --------------------------------------------------------------------
-  const scrollBase = '      GIBSON  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  type  nyx <message>  to talk to her  ctrl+shift+O see-through  ctrl+shift+F frame  ctrl+shift+S hide this scroller  ctrl+shift+L hide the logo  ctrl+shift+J your own music  ctrl+shift+P play/pause  ctrl+shift+[ ] tracks  right-click for the menu  F11 fullscreen  ::  ';
+  const scrollBase = '      GIBSON  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  type  nyx <message>  to talk to her  ctrl+shift+O see-through  ctrl+shift+F frame  ctrl+shift+S hide this scroller  ctrl+shift+L hide the logo  ctrl+shift+D data packets  ctrl+shift+J your own music  ctrl+shift+P play/pause  ctrl+shift+[ ] tracks  right-click for the menu  F11 fullscreen  ::  ';
   let scroll = scrollBase;
   const nyx = new Nyx(cfg, {
     info: () => ({ user: B.user, host: B.host, hour: new Date().getHours(), activity: act.level().toFixed(2), cwd: (worldEnv.fs && worldEnv.fs.cwd) || B.cwd }),
@@ -196,7 +196,7 @@
 
   // --- worlds + fx ------------------------------------------------------------
   worldEnv.fs = await window.gibson.listDir(focused.id);
-  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news }));
+  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news, packets: cfg.packets !== false }));
 
   // --- live data: polled fast while its world is showing, slowly otherwise, so NYX can react ---
   const services = new Set(), hogs = new Map(), titles = new Set();
@@ -286,6 +286,7 @@
     }
     else if (a.startsWith('music:')) return musicAction(a);
     else if (a === 'logo') { setLogo(!cfg.logo); window.gibson.save('logo', cfg.logo); }
+    else if (a === 'packets') { cfg.packets = cfg.packets === false; window.gibson.save('packets', cfg.packets); }
     else if (a === 'tempo') { cfg.music.mode = cfg.music.mode === 'reactive' ? 'fixed' : 'reactive'; nyx.ctx.say(`Tempo ${cfg.music.mode === 'fixed' ? 'locked at ' + cfg.music.bpm : 'follows your hands'}.`, 'playful'); }
     else if (a === 'nyx') { cfg.nyx.on = !cfg.nyx.on; $('nyx').style.opacity = cfg.nyx.on ? 1 : 0.3; }
     else if (a === 'world') { const n = Worlds.names; Worlds.go(n[(n.indexOf(Worlds.current()) + 1) % n.length]); }
@@ -314,7 +315,7 @@
       selection: !!focused.term.getSelection(), panes: tab.panes.length, tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
       worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
       music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
-      source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false,
+      source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false, packets: cfg.packets !== false,
     });
   });
 

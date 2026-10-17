@@ -29,7 +29,7 @@ It is mostly for fun. But some of it is genuinely handy:
 
 ## Status
 
-**0.6.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
+**0.7.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
 are produced and smoke-tested by CI, but nobody has lived in them yet.
 
 | | |
@@ -37,7 +37,7 @@ are produced and smoke-tested by CI, but nobody has lived in them yet.
 | Real shell (node-pty), xterm.js 6 with WebGL, links, Unicode 11 | done |
 | Tabs, each with 1 to 4 tiled panes; per-pane opacity; framed or full-window; hideable logo and scroller | done |
 | Talk to NYX from any pane: `nyx <message>` | done |
-| Twenty-one wireframe worlds, three of them live system data and one your RSS feeds | done |
+| Twenty-two wireframe worlds, three of them live system data and one your RSS feeds | done |
 | Reactive synth soundtrack, 84 to 162 BPM, following your activity | done |
 | Jukebox: your own music folder, with controls, visuals pumping on its beat | done |
 | Modem dial-in on startup (DTMF, answer tone, handshake screech) | done |
@@ -58,6 +58,7 @@ is anyone's real machine.
 | ![Light cycles](docs/screenshots/cycles.png) **LIGHT CYCLES**: six riders, one arena | ![Battlezone](docs/screenshots/battlezone.png) **BATTLEZONE**: vector tanks and a radar sweep |
 | ![Four panes, four opacities](docs/screenshots/tiled.png) **Four panes**, each at its own opacity | ![Full window](docs/screenshots/unframed.png) **Full window**: no frame, the planet behind your panes |
 | ![Space battle](docs/screenshots/battle.png) **DEEP SPACE**: fleets trading lasers | ![Data tunnel](docs/screenshots/tunnel.png) **DATASTREAM**: down the wire |
+| ![Flying toasters](docs/screenshots/toasters.png) **FLYING TOASTERS**: and toast, some of it burnt | |
 
 Also in the box: THE GRID, NEON CITY, ORBIT, RAVE WAREHOUSE, GIT GALAXY, HIGHWAY, DEEP SEA,
 PROCESS HIVE, 3D PIPES, 3D MAZE and THE STREET.
@@ -106,7 +107,7 @@ python3`). Optional: [Ollama](https://ollama.com) for NYX's local brain.
    ```
    Expected output:
    ```
-   > gibson@0.6.0 test
+   > gibson@0.7.0 test
    > node test/check.mjs
 
    check: all passed
@@ -154,6 +155,7 @@ Everything below is also on the **right-click menu**.
 | `Ctrl+Shift+F` | framed (centred, glowing border) or full window |
 | `Ctrl+Shift+L` | hide or show the GIBSON logo bar |
 | `Ctrl+Shift+S` | hide or show the scroller along the bottom |
+| `Ctrl+Shift+D` | hide or show the data packets streaming in from the sides |
 | `Ctrl+Shift+W` | next world (the right-click menu picks any) |
 | `Ctrl+Shift+R` | Matrix rain, now |
 | `Ctrl+Shift+N` | NYX on/off |
@@ -193,11 +195,12 @@ about your taste.
 | PROCESS HIVE | a program hogging the CPU |
 | NEWSWIRE | a fresh headline on your feeds |
 | LIGHT CYCLES | NYX feeling playful |
-| HIGHWAY, DEEP SEA, NEON CITY, DEEP SPACE, THE GRID | NYX's other moods |
-| DATASTREAM, ORBIT, THE STREET, BATTLEZONE | the menu or `Ctrl+Shift+W` |
+| HIGHWAY, NEON CITY, DEEP SPACE, THE GRID | NYX's other moods |
+| FLYING TOASTERS | NYX feeling tender, or the menu |
+| DATASTREAM, ORBIT, DEEP SEA, THE STREET, BATTLEZONE | the menu or `Ctrl+Shift+W` |
 
 **Settings** live in `config.json`, created on first run. The view choices (opacity, frame, logo,
-scroller) and the music choices are remembered for you; everything else you edit by hand
+scroller, packets) and the music choices are remembered for you; everything else you edit by hand
 ("Open config.json" on the right-click menu), then restart.
 
 | System | Path |
@@ -213,6 +216,7 @@ scroller) and the music choices are remembered for you; everything else you edit
   "framed": true,
   "logo": true,
   "scroller": true,
+  "packets": true,
   "opacity": 0.86,
   "music": { "on": true, "source": "synth", "folder": "", "shuffle": true, "mode": "reactive", "bpm": 128, "volume": 0.55 },
   "news":  { "feeds": ["https://hnrss.org/frontpage", "https://www.theregister.com/security/headlines.atom"], "minutes": 15 },
@@ -243,7 +247,7 @@ npx electron . --shot out.png --world battle --panes 2 --unframed --at 8
 
 `--shot` renders offscreen and saves a PNG (works over RDP; no window opens). `--world` is one of
 `grid`, `city`, `files`, `battle`, `planet`, `tunnel`, `core`, `bbs`, `rave`, `git`, `ice`,
-`highway`, `sea`, `pipes`, `maze`, `cycles`, `battlezone`, `street`, `net`, `hive`, `news`;
+`highway`, `sea`, `pipes`, `maze`, `cycles`, `battlezone`, `street`, `net`, `hive`, `news`, `toasters`;
 `--tabs 3` opens three tabs and `--chat "are you real?"` types `nyx are you real?` into the first
 pane. Shot mode uses a made-up folder, user, connections, programs and headlines, so a capture
 never shows your machine. `npm run shots` regenerates everything in `docs/screenshots/`.
