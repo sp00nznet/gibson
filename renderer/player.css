@@ -1,0 +1,32 @@
+/* GIBSON AMP: the jukebox as a tiny 90s media-player main window, in the neon palette.
+   Replaces the #player / #track rules in style.css. Drawn by Jukebox.prototype.draw. */
+#player {
+  position: fixed; right: 16px; bottom: 12px; z-index: 6; width: 275px; max-width: none; box-sizing: border-box; display: block; padding: 0;
+  background: linear-gradient(#1a0826, #0a0010); border: 1px solid #ff2e88; outline: 1px solid #3a0f4a; outline-offset: 1px;
+  box-shadow: 0 0 14px rgba(255, 46, 136, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  font: 11px 'Cascadia Mono', Consolas, monospace; color: #8bffc4; opacity: 0.7; transition: opacity 0.3s; user-select: none;
+}
+#player:hover { opacity: 1; }
+#player.off { display: none; }
+#player .bar {
+  height: 13px; line-height: 13px; text-align: center; font-size: 9px; letter-spacing: 2px; color: #ffd6ec; white-space: nowrap; overflow: hidden;
+  background: linear-gradient(90deg, transparent 28%, #2a0a36 28% 72%, transparent 72%), repeating-linear-gradient(0deg, #ff2e88 0 1px, transparent 1px 3px) left center / 100% 7px no-repeat, #2a0a36; text-shadow: 0 0 4px #ff2e88, 0 0 1px #000;
+}
+#player .body { display: grid; grid-template-columns: 92px 1fr; gap: 4px; padding: 4px 5px 3px; }
+#player .scr { grid-row: span 2; background: #020a06; border: 1px solid #0f3a26; box-shadow: inset 0 0 6px #000; padding: 2px 3px; }
+#player .lcd { font: bold 20px/20px 'Cascadia Mono', Consolas, monospace; color: #39ff9c; text-shadow: 0 0 6px #39ff9c; text-align: right; letter-spacing: 1px; }
+#player .lcd.blink { animation: lcdblink 1s steps(1) infinite; }
+@keyframes lcdblink { 50% { opacity: 0; } }
+#player canvas { display: block; width: 84px; height: 22px; margin-top: 2px; }
+#player .marq { background: #020a06; border: 1px solid #0f3a26; overflow: hidden; white-space: nowrap; height: 14px; line-height: 14px; }
+#track { display: inline-block; padding: 0 0 0 100%; overflow: visible; color: #ffd6ec; text-shadow: 0 0 5px #ff2e88; animation: marq 14s linear infinite; }
+@keyframes marq { to { transform: translateX(-100%); } }
+#player .info { font-size: 9px; color: #39ff9c; opacity: 0.8; letter-spacing: 1px; align-self: end; }
+#player .btns { display: flex; gap: 2px; padding: 0 5px 5px; }
+#player button {
+  font: bold 10px 'Cascadia Mono', Consolas, monospace; color: #8bffc4; cursor: pointer; padding: 1px 0; min-width: 22px; flex: 1;
+  background: linear-gradient(#2a3a33, #0c1611); border: 1px solid; border-color: #4f6a5d #08100c #08100c #4f6a5d;
+}
+#player button:active { border-color: #08100c #4f6a5d #4f6a5d #08100c; }
+#player button:hover, #player button.lit { color: #fff; text-shadow: 0 0 5px #ff2e88; }
+#player button.lit { background: linear-gradient(#4a1030, #1a0412); }

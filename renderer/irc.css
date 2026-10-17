@@ -1,0 +1,42 @@
+/* The IRC lobby beside the terminal (renderer/irc.js). #mid holds the tabs and the panel side by side. */
+#mid { flex: 1; min-height: 0; display: flex; }
+#mid > #termwrap { flex: 1; min-width: 0; }
+
+.irc-panel {
+  flex: none; width: 360px; position: relative; display: flex; flex-direction: column; min-width: 0;
+  font: 12px 'Cascadia Mono', Consolas, monospace; color: #b8ffd9;
+  background: rgba(2, 6, 4, 0.86); border-left: 1px solid rgba(57, 255, 156, 0.25);
+}
+.irc-panel.irc-off { display: none; }
+.irc-panel:focus-within { border-left-color: rgba(255, 46, 136, 0.7); box-shadow: -4px 0 14px rgba(255, 46, 136, 0.2); }
+.irc-grip { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 2; }
+
+.irc-title {
+  flex: none; padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: linear-gradient(90deg, rgba(54, 214, 255, 0.16), transparent 80%), rgba(0, 0, 0, 0.55);
+  border-bottom: 1px solid rgba(54, 214, 255, 0.3);
+}
+.irc-chan { color: #36d6ff; font-weight: bold; text-shadow: 0 0 6px #36d6ff; }
+.irc-topic { color: #ffc448; margin-left: 8px; }
+
+.irc-body { flex: 1; min-height: 0; display: flex; }
+.irc-log { flex: 1; min-width: 0; overflow-y: auto; padding: 4px 6px; line-height: 1.4; }
+.irc-log > div { white-space: pre-wrap; overflow-wrap: anywhere; padding-left: 8ch; text-indent: -8ch; } /* wrapped lines hang past the timestamp */
+.irc-nicks { flex: none; width: 104px; overflow: hidden auto; padding: 4px 6px; border-left: 1px solid rgba(57, 255, 156, 0.15); white-space: nowrap; }
+
+.irc-ts { color: #4d6b5c; }
+.irc-self { color: #fff; font-weight: bold; }
+.irc-nyx { color: #ff2e88; font-weight: bold; text-shadow: 0 0 6px #ff2e88; }
+.irc-nyxline { color: #ffd6ec; }
+.irc-act { color: #a860ff; font-style: italic; }
+.irc-act .irc-ts { font-style: normal; }
+.irc-priv { color: #ff7ab8; }
+.irc-notice { color: #ffc448; }
+.irc-dim { color: #4d6b5c; }
+.irc-dim span:not(.irc-ts) { opacity: 0.75; }
+.irc-sys { color: #36d6ff; opacity: 0.85; }
+.irc-err { color: #ff2e88; }
+
+.irc-inputrow { flex: none; display: flex; align-items: center; border-top: 1px solid rgba(57, 255, 156, 0.25); background: rgba(0, 0, 0, 0.55); }
+.irc-me { padding-left: 8px; color: #ff7ab8; }
+.irc-input { flex: 1; min-width: 0; font: inherit; color: #fff; background: transparent; border: none; outline: none; padding: 5px 8px; caret-color: #ff2e88; }
