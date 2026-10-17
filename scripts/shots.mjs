@@ -7,7 +7,8 @@ const electron = createRequire(import.meta.url)('electron'); // the binary's pat
 const SHOTS = [
   ['files', 'files', 1], ['battle', 'battle', 1], ['city', 'city', 1], ['tunnel', 'tunnel', 1],
   ['tiled', 'grid', 4], ['unframed', 'planet', 2, '--unframed'],
+  ['tabs', 'city', 2, '--tabs', '3', '--chat', 'are you real?'],
 ];
 for (const [name, world, panes, ...extra] of SHOTS) {
-  execFileSync(electron, ['.', '--shot', `docs/screenshots/${name}.png`, '--world', world, '--panes', String(panes), '--at', '11', ...extra], { stdio: 'inherit' });
+  execFileSync(electron, ['.', '--shot', `docs/screenshots/${name}.png`, '--world', world, '--panes', String(panes), '--at', '16', ...extra], { stdio: 'inherit' });
 }

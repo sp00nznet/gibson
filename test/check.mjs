@@ -70,6 +70,14 @@ assert.deepEqual(await llmLine({ provider: 'openai', shareOutput: true }, ev), {
 assert.ok(seen.init.body.includes('SECRET'), 'shareOutput sends it');
 assert.equal(await llmLine({ provider: 'none' }, ev), null);
 
+// --- `nyx <message>`: the conversation goes along, opening with a user turn ---
+const chatEv = { kind: 'chat', message: 'are you real?', user: 'h', hour: 2, activity: '0.1',
+  history: [{ who: 'nyx', text: 'orphan reply' }, { who: 'user', text: 'hi' }, { who: 'nyx', text: 'hello, insect' }] };
+await llmLine({ provider: 'anthropic' }, chatEv);
+assert.deepEqual(seen.body.messages.map((m) => m.role), ['user', 'assistant', 'user'], 'history alternates and opens with the user');
+assert.ok(seen.body.messages.at(-1).content.includes('are you real?'), 'the message is sent');
+assert.equal(parse('[tender] ' + 'x'.repeat(400), 280).text.length, 280, 'chat replies may run longer');
+
 globalThis.fetch = async () => ({ ok: true, json: async () => ({ stop_reason: 'refusal', content: [] }) });
 assert.equal(await llmLine({ provider: 'anthropic' }, ev), null, 'refusal falls back to canned lines');
 

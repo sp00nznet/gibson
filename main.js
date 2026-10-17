@@ -18,6 +18,8 @@ const WORLD = arg('--world');          // force a starting world (screenshots)
 const MUTE = argv.includes('--mute');
 const PANES = Number(arg('--panes') || 1); // start with 1-4 panes
 const UNFRAMED = argv.includes('--unframed');
+const TABS = Number(arg('--tabs') || 1); // start with this many tabs (screenshots)
+const CHAT = arg('--chat');                // shots: say this to NYX
 
 const DEFAULTS = {
   shell: process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash'),
@@ -111,7 +113,7 @@ function listDir(dir) {
   } catch { return []; }
 }
 
-const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'tile', O: 'opacity', F: 'frame' };
+const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'frame' };
 
 // Right-click menu. The page sends its current state; clicks come back as hotkey actions.
 function contextMenu(st) {
@@ -120,6 +122,8 @@ function contextMenu(st) {
   return Menu.buildFromTemplate([
     item('Copy', 'copy', 'C', { enabled: st.selection }), item('Paste', 'paste', 'V'),
     { type: 'separator' },
+    item('New tab', 'newtab', 'T'),
+    item('Close tab', 'closetab', 'X'),
     { label: 'Panes', submenu: [1, 2, 3, 4].map((n) => ({ label: `${n}`, type: 'radio', checked: n === st.panes, accelerator: `Ctrl+Shift+${n}`, registerAccelerator: false, click: act('panes:' + n) })) },
     { label: 'World', submenu: st.worlds.map(([key, label]) => ({ label, type: 'radio', checked: key === st.world, click: act('world:' + key) })) },
     { type: 'separator' },
@@ -157,6 +161,8 @@ function createWindow() {
     const k = i.key.length === 1 ? i.key.toUpperCase() : i.key;
     const digit = /^Digit([1-4])$/.exec(i.code); // Ctrl+Shift+1..4: i.key is '!' etc, so read the code
     if (digit && i.control && i.shift) { e.preventDefault(); return win.webContents.send('hotkey', 'panes:' + digit[1]); }
+    const tabKey = i.control && ((i.key === 'Tab' && (i.shift ? 'prevtab' : 'nexttab')) || (i.key === 'PageDown' && 'nexttab') || (i.key === 'PageUp' && 'prevtab'));
+    if (tabKey) { e.preventDefault(); return win.webContents.send('hotkey', tabKey); }
     if (k === 'F11' || (i.control && i.shift && HOTKEYS[k])) { e.preventDefault(); win.webContents.send('hotkey', k === 'F11' ? 'fullscreen' : HOTKEYS[k]); }
   });
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
@@ -170,7 +176,7 @@ function createWindow() {
       fs.writeFileSync(path.resolve(SHOT), img.toPNG());
       console.log('shot:', path.resolve(SHOT));
       for (const id of [...panes.keys()]) killShell(id);
-      app.exit(0);
+      setTimeout(() => app.exit(0), 1000); // let node-pty finish closing ConPTY, or Electron crashes on exit
     }, SHOT_AT * 1000);
   }
 }
@@ -180,7 +186,7 @@ app.whenReady().then(() => {
   if (SHOT) { cfg = { ...demoShell(cfg), framed: true, opacity: 0.86 }; home = demoHome(); } // shots ignore saved view choices
   ipcMain.handle('boot', () => ({
     cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined } },
-    user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, unframed: UNFRAMED,
+    user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, tabs: TABS, chat: CHAT, unframed: UNFRAMED,
     shot: !!SHOT, world: WORLD, mute: MUTE, bootShot: argv.includes('--boot'),
   }));
   ipcMain.on('pty:open', (_e, id) => { if (!panes.has(id)) spawnShell(id); });
@@ -201,4 +207,4 @@ app.whenReady().then(() => {
   createWindow();
 });
 
-app.on('window-all-closed', () => { for (const id of [...panes.keys()]) killShell(id); app.quit(); });
+app.on('window-all-closed', () => { for (const id of [...panes.keys()]) killShell(id); setTimeout(() => app.quit(), 500); }); // see the shot exit

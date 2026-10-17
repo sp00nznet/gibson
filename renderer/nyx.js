@@ -39,6 +39,12 @@
     streak: [['impressed', 'Now THAT is typing. Keep it up, netrunner.'], ['intense', 'Faster. Faster. Feel the bass?'], ['impressed', 'You are on fire. Metaphorically. Probably.']],
     compile: [['intense', 'Light one up. This is going to take a while.'], ['bored', 'Compiling. Of course. I will just watch the smoke.'], ['tender', 'Let it build. You earned a break.']],
     done: [['impressed', 'It finished. Did it work, though?'], ['playful', 'Stub it out. Back to work.']],
+    chat: [ // no model configured, or it failed: she still answers, briefly
+      ['playful', 'I hear you. Plug me into a model (llm.provider) and I will argue properly.'],
+      ['taunting', 'Talk is cheap, insect. Type something that compiles.'],
+      ['tender', 'I am listening. I am always listening.'], ['bored', 'Mm-hm. Fascinating. Back to work.'],
+      ['curious', 'Ask me again when the build passes.'], ['playful', 'You talk to your terminal now? Good. So do I.'],
+    ],
     late: [['tender', 'It is late, hacker. The best exploits are written at this hour.'], ['taunting', 'Still awake? Your sleep schedule is a vulnerability.']],
   };
 
@@ -56,6 +62,7 @@
   function Nyx(cfg, ctx) {
     this.cfg = cfg; this.ctx = ctx; // ctx: { say(text, mood), llm(ev), info() }
     this.lastLlm = 0; this.lastSaid = 0; this.used = new Set(); this.mood = 'welcoming';
+    this.history = []; // the `nyx` conversation, newest last
   }
   Nyx.prototype.canned = function (kind) {
     const pool = LINES[kind] || LINES.cmd, fresh = pool.filter((l) => !this.used.has(l[1]));
@@ -78,6 +85,21 @@
     if (!line.mood) line.mood = this.canned(kind).mood;
     this.mood = line.mood;
     this.ctx.say(line.text, line.mood, MOOD_WORLD[line.mood]);
+  };
+  // `nyx <message>` in a terminal: always answers, no chatter roll, no LLM rate limit.
+  Nyx.prototype.chat = async function (message) {
+    this.history.push({ who: 'user', text: message || '(just says your name)' });
+    let line = null;
+    if (this.cfg.llm.provider !== 'none') {
+      line = await this.ctx.llm({ kind: 'chat', message: message || '(just says your name)', history: this.history.slice(-9, -1), ...this.ctx.info() });
+    }
+    if (!line) line = this.canned('chat');
+    if (!line.mood) line.mood = 'playful';
+    this.history.push({ who: 'nyx', text: line.text });
+    if (this.history.length > 16) this.history.splice(0, this.history.length - 16);
+    this.mood = line.mood; this.lastSaid = Date.now();
+    this.ctx.say(line.text, line.mood, MOOD_WORLD[line.mood]);
+    return line;
   };
   Nyx.prototype.command = function (cmd) {
     if (!cmd.trim()) return;

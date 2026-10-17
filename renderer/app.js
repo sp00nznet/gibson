@@ -21,18 +21,51 @@
       brightBlack: '#4d6b5c', brightRed: '#ff6b8b', brightGreen: '#8bffc4', brightYellow: '#ffe680', brightBlue: '#7cc4ff', brightMagenta: '#ff7ab8', brightCyan: '#8ae9ff', brightWhite: '#ffffff',
     },
   };
-  const panes = []; let focused = null, nextId = 1;
+  // Tabs each hold 1 to 4 panes. Pane ids are global: main.js keys its shells by them.
+  const tabs = []; let tab = null, focused = null, nextId = 1, nextTab = 1;
+  const allPanes = () => tabs.flatMap((t) => t.panes);
 
-  function makePane() {
+  function makeTab() {
+    const t = { n: nextTab++, panes: [], focused: null, cwdName: '', el: document.createElement('div'), btn: document.createElement('button') };
+    t.el.className = 'tab n1'; $('termwrap').appendChild(t.el);
+    t.btn.className = 'tabbtn'; t.btn.title = 'middle-click closes';
+    t.btn.onclick = () => switchTab(t);
+    t.btn.onauxclick = (e) => { if (e.button === 1) closeTab(t); };
+    $('tabs').insertBefore(t.btn, $('newtab'));
+    tabs.push(t); makePane(t); label(t);
+    window.gibson.listDir(t.panes[0].id).then((fs) => { t.cwdName = baseName(fs.cwd); label(t); });
+    return t;
+  }
+  function label(t) {
+    t.btn.textContent = `${t.n}:${t.cwdName || 'shell'}${t.panes.length > 1 ? ' [' + t.panes.length + ']' : ''}`;
+  }
+  function switchTab(t) {
+    tab = t;
+    for (const x of tabs) { x.el.classList.toggle('hidden', x !== t); x.btn.classList.toggle('on', x === t); }
+    $('tabs').classList.toggle('solo', tabs.length < 2);
+    focused = null; setFocus(t.focused || t.panes[0]); focused.term.focus();
+  }
+  function closeTab(t) {
+    const i = tabs.indexOf(t);
+    for (const p of t.panes.slice()) closePane(p);
+    t.el.remove(); t.btn.remove(); tabs.splice(i, 1);
+    if (!tabs.length) makeTab();
+    switchTab(tab === t || !tabs.includes(tab) ? tabs[Math.min(i, tabs.length - 1)] : tab);
+  }
+  const stepTab = (d) => switchTab(tabs[(tabs.indexOf(tab) + d + tabs.length) % tabs.length]);
+  const baseName = (dir) => dir.split(/[\\/]/).filter(Boolean).pop() || dir;
+
+  function makePane(t) {
     const id = nextId++, el = document.createElement('div');
-    el.className = 'pane'; $('termwrap').appendChild(el);
+    el.className = 'pane'; t.el.appendChild(el);
     const term = new Terminal(TERM_OPTS), fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon.WebLinksAddon((_e, uri) => window.open(uri)));
     term.loadAddon(new Unicode11Addon.Unicode11Addon()); term.unicode.activeVersion = '11';
     term.open(el);
     try { const gl = new WebglAddon.WebglAddon(); gl.onContextLoss(() => gl.dispose()); term.loadAddon(gl); } catch { /* DOM renderer is fine */ }
-    const p = { id, el, term, line: '', lastCmd: '', outTail: '', errorSeen: false };
+    const chat = document.createElement('div'); chat.className = 'nyxchat'; el.appendChild(chat);
+    const p = { id, el, term, tab: t, chat, line: '', lastCmd: '', outTail: '', errorSeen: false };
     window.gibson.open(id);
     const doFit = () => { try { fit.fit(); window.gibson.resize(id, term.cols, term.rows); } catch { /* hidden */ } };
     p.ro = new ResizeObserver(doFit); p.ro.observe(el); doFit();
@@ -40,38 +73,44 @@
     // ponytail: the typed line is rebuilt from keystrokes. History recall and
     // tab completion are invisible to it; NYX just sees what you typed by hand.
     term.onData((d) => {
-      window.gibson.write(id, d);
       act.key(d[0] === '\x7f' || d[0] === '\x1b' ? 0.1 : 1); // backspace and arrows aren't a frenzy
+      if ((d === '\r' || d === '\n') && /^\s*nyx(\s|$)/i.test(p.line)) { // `nyx <message>` is for her, not the shell
+        window.gibson.write(id, '\x03');                  // cancel the line in the shell
+        nyxChat(p, p.line.trim().slice(3).trim()); p.line = '';
+        return;
+      }
+      window.gibson.write(id, d);
       if (d === '\r') { onCommand(p, p.line); p.line = ''; }
       else if (d === '\x7f') p.line = p.line.slice(0, -1);
       else if (d === '\x03') p.line = '';
       else if (d[0] !== '\x1b') p.line += d.replace(/[\x00-\x1f]/g, '');
     });
     p.el.style.setProperty('--term-alpha', p.opacity = cfg.opacity ?? 0.86);
-    panes.push(p);
+    t.panes.push(p);
     return p;
   }
   function closePane(p) {
     p.ro.disconnect(); p.term.dispose(); p.el.remove(); window.gibson.close(p.id);
-    panes.splice(panes.indexOf(p), 1);
+    p.tab.panes.splice(p.tab.panes.indexOf(p), 1);
+    if (p.tab.focused === p) p.tab.focused = null;
   }
   function setFocus(p) {
     if (focused === p) return;
-    focused = p;
-    for (const x of panes) x.el.classList.toggle('focus', x === p);
-    window.gibson.listDir(p.id).then((fs) => { worldEnv.fs = fs; Worlds.refreshFiles(); });
+    focused = p; p.tab.focused = p;
+    for (const x of p.tab.panes) x.el.classList.toggle('focus', x === p);
+    window.gibson.listDir(p.id).then((fs) => { worldEnv.fs = fs; Worlds.refreshFiles(); p.tab.cwdName = baseName(fs.cwd); label(p.tab); });
   }
   // Growing adds panes; shrinking closes the newest ones, never the focused one.
   function setPanes(n) {
     n = Math.max(1, Math.min(4, n));
-    while (panes.length < n) makePane();
-    while (panes.length > n) closePane(panes.slice().reverse().find((p) => p !== focused));
-    $('termwrap').className = 'n' + n;
+    while (tab.panes.length < n) makePane(tab);
+    while (tab.panes.length > n) closePane(tab.panes.slice().reverse().find((p) => p !== focused));
+    tab.el.className = 'tab n' + n; label(tab);
     focused.term.focus();
   }
 
   window.gibson.onData((id, d) => {
-    const p = panes.find((x) => x.id === id); if (!p) return;
+    const p = allPanes().find((x) => x.id === id); if (!p) return;
     p.term.write(d); act.output(d.length);
     const plain = d.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07/g, '');
     p.outTail = (p.outTail + plain).slice(-2000);
@@ -83,15 +122,37 @@
   function onCommand(p, cmd) {
     p.lastCmd = cmd; p.errorSeen = false;
     window.gibson.line(p.id, cmd);
-    if (NYX_KIND(cmd) === 'cd') setTimeout(async () => { worldEnv.fs = await window.gibson.listDir(p.id); go('files'); Worlds.refreshFiles(); }, 250);
+    if (NYX_KIND(cmd) === 'cd') setTimeout(async () => {
+      worldEnv.fs = await window.gibson.listDir(p.id); go('files'); Worlds.refreshFiles();
+      p.tab.cwdName = baseName(worldEnv.fs.cwd); label(p.tab);
+    }, 250);
     $('frame').style.setProperty('--warp', 1); warp = 1; // the Enter lunge
     nyx.command(cmd);
   }
-  setFocus(makePane());
+
+  // Talking to NYX. The exchange shows in an overlay on the pane, not in the terminal
+  // text: anything written into xterm behind ConPTY's back is painted over by its next redraw.
+  async function nyxChat(p, message) {
+    const add = (cls, text) => {
+      const d = document.createElement('div'); d.className = cls; d.textContent = text; p.chat.appendChild(d);
+      while (p.chat.children.length > 8) p.chat.firstChild.remove();
+      return d;
+    };
+    add('you', '> ' + (message || 'nyx'));
+    const reply = add('her', 'NYX> ...');
+    p.chat.classList.add('show'); clearTimeout(p.chatHide);
+    const line = await nyx.chat(message);
+    reply.textContent = 'NYX> ' + line.text;
+    p.chatHide = setTimeout(() => p.chat.classList.remove('show'), 30000);
+  }
+
+  switchTab(makeTab());
   if (B.panes > 1) setPanes(B.panes);
+  for (let i = 1; i < (B.tabs || 1); i++) makeTab();
+  if (B.tabs > 1) switchTab(tabs[0]);
 
   // --- NYX --------------------------------------------------------------------
-  const scrollBase = '      GIBSON v0.1  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+1-4 panes  ctrl+shift+O see-through  ctrl+shift+F frame  right-click for the menu  F11 fullscreen  ::  ';
+  const scrollBase = '      GIBSON  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  type  nyx <message>  to talk to her  ctrl+shift+O see-through  ctrl+shift+F frame  right-click for the menu  F11 fullscreen  ::  ';
   let scroll = scrollBase;
   const nyx = new Nyx(cfg, {
     info: () => ({ user: B.user, host: B.host, hour: new Date().getHours(), activity: act.level().toFixed(2), cwd: (worldEnv.fs && worldEnv.fs.cwd) || B.cwd }),
@@ -138,17 +199,21 @@
       const o = a === 'opacity' ? OPACITY[(OPACITY.findIndex((x) => x <= focused.opacity + 0.001) + 1) % OPACITY.length] : Number(a.slice(8));
       setOpacity(focused, o); cfg.opacity = o; window.gibson.save('opacity', o);
     }
-    else if (a === 'tile') return setPanes(panes.length % 4 + 1);
     else if (a.startsWith('panes:')) return setPanes(Number(a.slice(6)));
+    else if (a === 'newtab') return switchTab(makeTab());
+    else if (a === 'closetab') return closeTab(tab);
+    else if (a === 'nexttab') return stepTab(1);
+    else if (a === 'prevtab') return stepTab(-1);
     else if (a === 'fullscreen') window.gibson.fullscreen();
     t.focus();
   }
   window.gibson.onHotkey(action);
+  $('newtab').onclick = () => action('newtab');
   addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    const p = panes.find((x) => x.el.contains(e.target)); if (p) p.term.focus();
+    const p = tab.panes.find((x) => x.el.contains(e.target)); if (p) p.term.focus();
     window.gibson.menu({
-      selection: !!focused.term.getSelection(), panes: panes.length, opacity: focused.opacity, framed: cfg.framed,
+      selection: !!focused.term.getSelection(), panes: tab.panes.length, tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed,
       worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
       music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
     });
@@ -202,8 +267,9 @@
   nyx.event('boot', {}, true);
 
   if (B.shot) { // headless screenshot: give it something to look at
-    if (panes.length > 1) panes.forEach((p, i) => setOpacity(p, [0.86, 0.55, 0.3, 0.7][i]));
-    setTimeout(() => panes.forEach((p, i) => window.gibson.write(p.id, demoCmd(i))), 1500);
+    if (tab.panes.length > 1) tab.panes.forEach((p, i) => setOpacity(p, [0.86, 0.55, 0.3, 0.7][i]));
+    setTimeout(() => tab.panes.forEach((p, i) => window.gibson.write(p.id, demoCmd(i))), 1500);
+    if (B.chat) setTimeout(() => { const t = tab.panes[0].term; for (const ch of `nyx ${B.chat}`) t.input(ch); }, 4000); // the real keystroke path
     act.keys = 30;
     setInterval(() => { act.key(); act.key(); }, 100);
   }

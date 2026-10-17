@@ -17,7 +17,9 @@ Two processes, as Electron always has: **main** owns the machine, the **page** o
 `preload.js` is the whole bridge; the page has no other way to reach the machine.
 
 Every pane has an id; each `pty:*` message carries it, and the main process keeps one shell and
-one tracked working directory per id. The FILESYSTEM world follows the focused pane.
+one tracked working directory per id. Tabs exist only in the page: a tab is a grid of 1 to 4
+panes, hidden tabs are `display: none` (their shells keep running), and pane ids are global
+across tabs so main never needs to know about tabs. The FILESYSTEM world follows the focused pane.
 
 Hotkeys are caught in main (`before-input-event`) and sent to the page as actions, the same
 actions the right-click menu sends. Catching them in the page proved unreliable.
@@ -58,6 +60,21 @@ The page rebuilds the current command from keystrokes (`app.js`). History recall
 completion are invisible to it, so NYX sees what you typed by hand. Asking the shell instead
 needs a per-shell prompt hook (OSC 7/133); that is the upgrade path. The main process tracks the
 working directory the same way, from `cd` lines, for the FILESYSTEM world.
+
+## Talking to NYX
+
+`nyx <message>` is caught in `app.js` when Enter arrives on a typed line that starts with `nyx`.
+The line is cancelled in the shell with Ctrl+C rather than sent, and NYX's answer is shown in an
+overlay on the pane, not written into the terminal. Why: on Windows the shell sits behind ConPTY,
+which keeps its own copy of the screen and repaints from it; text that xterm.js shows without
+ConPTY knowing gets overwritten on its next redraw.
+
+A chat skips the chatter roll and the `minGapSec` rate limit, and sends the last eight turns
+as real user/assistant messages (`llm.js` drops a leading assistant turn, since the Messages API
+wants the user first). Replies may run to 280 characters instead of 160.
+
+`term.input()` delivers Enter as `\n`, where a real keypress sends `\r`; the check accepts both,
+which is what lets the screenshot type a real `nyx` line through the keystroke path.
 
 ## Worlds
 

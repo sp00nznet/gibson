@@ -1,7 +1,7 @@
 # Roadmap
 
 ## Next
-- Tabs, and splits other than the fixed 2x2.
+- Splits other than the fixed layouts (drag to resize, more than four panes).
 - Shell prompt hooks (OSC 7/133) so NYX and the FILESYSTEM world see the real working
   directory and command, including history recall and tab completion.
 - A settings screen instead of editing `config.json`.

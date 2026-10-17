@@ -4,6 +4,26 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-17
+
+### Added
+- Tabs (`Ctrl+Shift+T` new, `Ctrl+Shift+X` close, `Ctrl+Tab` / `Ctrl+Shift+Tab` to move, the
+  `+` button, middle-click to close). Each tab has its own 1 to 4 panes and is named after its
+  folder; the tab bar shows once there are two tabs.
+- `nyx <message>` in any pane talks to NYX directly. The shell line is cancelled, and the
+  exchange shows over the bottom of the pane. With a model she keeps the last few exchanges as
+  context; without one she answers from a small set of lines.
+- `--tabs` and `--chat` for screenshots.
+
+### Changed
+- `Ctrl+Shift+T` opens a tab; it used to cycle the pane count (`Ctrl+Shift+1`..`4` still sets it).
+
+### Fixed
+- Electron could crash on exit while node-pty was still closing ConPTY shells; quitting
+  now waits for them.
+- The release workflow's notes step never matched the CHANGELOG heading, so v0.2.0's release
+  was published by hand from the CI-built packages.
+
 ## [0.2.0] - 2026-10-16
 
 ### Added

@@ -9,13 +9,14 @@ suit her mood. A local or hosted LLM can write her lines; without one she has he
 
 ## Status
 
-**0.2.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
+**0.3.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
 builds are produced and smoke-tested by CI, but nobody has used them day to day yet.
 
 | | |
 |---|---|
 | Real shell (node-pty), xterm.js 6 with WebGL, links, Unicode 11 | done |
-| 1 to 4 tiled panes, per-pane opacity, framed or full-window view | done |
+| Tabs, each with 1 to 4 tiled panes; per-pane opacity; framed or full-window view | done |
+| Talk to NYX from any pane: `nyx <message>` | done |
 | Six wireframe worlds, ships flying through, data packets zipping by | done |
 | Reactive soundtrack: kick, bass, acid line, distorted guitar chugs, pad; 84 to 162 BPM | done |
 | Modem dial-in on startup (DTMF, answer tone, handshake) | done |
@@ -30,6 +31,9 @@ From the app itself, captured headless (`npm run shots`) in a made-up demo folde
 
 ![The current folder as a wireframe city, filenames on the towers](docs/screenshots/files.png)
 *FILESYSTEM: the folder you `cd` into, as towers. Directories are blue, files pink, height is size.*
+
+![Three tabs, two panes, and a conversation with NYX over the neon city](docs/screenshots/tabs.png)
+*Tabs (`Ctrl+Shift+T`), panes, and `nyx are you real?`: her answer floats over the pane.*
 
 ![Four shells tiled, each at its own opacity, over the synthwave grid](docs/screenshots/tiled.png)
 *Four panes (`Ctrl+Shift+4`), each at its own opacity (`Ctrl+Shift+O`).*
@@ -90,7 +94,7 @@ python3`). Optional: [Ollama](https://ollama.com) for NYX's local brain.
    ```
    Expected output:
    ```
-   > gibson@0.2.0 test
+   > gibson@0.3.0 test
    > node test/check.mjs
 
    check: all passed
@@ -120,7 +124,10 @@ Trip-ups:
 
 | Key | Does |
 |---|---|
-| `Ctrl+Shift+1`..`4` | that many panes, each its own shell; `Ctrl+Shift+T` cycles. Shrinking keeps the focused pane |
+| `nyx <message>` | type it in any pane and press Enter: NYX answers you (the shell never sees the line) |
+| `Ctrl+Shift+T` / `Ctrl+Shift+X` | new tab / close tab (or the `+` button; middle-click a tab to close it) |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | next / previous tab (also `Ctrl+PageDown` / `Ctrl+PageUp`) |
+| `Ctrl+Shift+1`..`4` | that many panes in this tab, each its own shell. Shrinking keeps the focused pane |
 | `Ctrl+Shift+O` | this pane's opacity, 100% down to 0% (the world shows through) |
 | `Ctrl+Shift+F` | framed (centred, glowing border) or full window |
 | `Ctrl+Shift+W` | next world |
@@ -131,6 +138,11 @@ Trip-ups:
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | copy / paste |
 | `F11` | fullscreen |
 | right-click | a menu with all of the above, a world picker, and `config.json` |
+
+Each tab has its own panes; the tab bar appears once there is more than one tab, and each tab is
+named after its folder. `nyx` with a message talks to her directly: with a model configured she
+remembers the last few exchanges; without one she still answers, briefly. The conversation shows
+over the bottom of the pane for 30 seconds.
 
 Opacity and the framed/full-window choice are remembered. The tempo follows your activity
 averaged over about 12 seconds (typing, and output scrolling past), so a burst barely moves it
@@ -173,7 +185,8 @@ Headless screenshot (no window opens, so it works over RDP):
 npx electron . --shot out.png --world battle --panes 2 --unframed --at 8
 ```
 
-`--world` is one of `grid`, `city`, `files`, `battle`, `planet`, `tunnel`. Shot mode runs the
+`--world` is one of `grid`, `city`, `files`, `battle`, `planet`, `tunnel`; `--tabs 3` opens three
+tabs and `--chat "are you real?"` types `nyx are you real?` into the first pane. Shot mode runs the
 shells in a made-up folder as `hacker@gibson`, so a capture never shows your machine.
 `npm run shots` regenerates everything in `docs/screenshots/`.
 
