@@ -56,10 +56,19 @@ takes 30 s to load must never stall the terminal. LLM calls are fire-and-forget.
 
 ## The typed line
 
-The page rebuilds the current command from keystrokes (`app.js`). History recall and tab
-completion are invisible to it, so NYX sees what you typed by hand. Asking the shell instead
-needs a per-shell prompt hook (OSC 7/133); that is the upgrade path. The main process tracks the
-working directory the same way, from `cd` lines, for the FILESYSTEM world.
+At Enter, `typedLine()` in `app.js` reads the command off the screen: the cursor's row, plus any
+rows it wrapped from, up to the cursor, with the prompt cut at its first `>`, `$`, `#` or `%`
+followed by a space. Reading the screen rather than the keystrokes is what lets a command recalled
+with Up, or finished with Tab, count: v0.3.0 rebuilt the line from keystrokes, so `nyx` recalled
+from history went to the shell and failed. Text right of the cursor is ignored because PSReadLine
+draws its grey predictions there.
+
+The keystroke copy (`p.line`) is still kept as the fallback for the moment before the shell has
+echoed what was typed (a fast paste-and-Enter, or the screenshot's scripted typing).
+
+The prompt rule is a heuristic: a prompt without one of those characters falls back to the
+keystrokes. A per-shell prompt hook (OSC 133) would be exact; that is the upgrade path. The main
+process tracks the working directory from the `cd` lines this produces, for the FILESYSTEM world.
 
 ## Talking to NYX
 

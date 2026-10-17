@@ -70,17 +70,20 @@
     const doFit = () => { try { fit.fit(); window.gibson.resize(id, term.cols, term.rows); } catch { /* hidden */ } };
     p.ro = new ResizeObserver(doFit); p.ro.observe(el); doFit();
     term.textarea.addEventListener('focus', () => setFocus(p));
-    // ponytail: the typed line is rebuilt from keystrokes. History recall and
-    // tab completion are invisible to it; NYX just sees what you typed by hand.
+    // At Enter the command is read off the screen (typedLine), so history recall and tab
+    // completion count. p.line, rebuilt from keystrokes, covers the moment before the
+    // shell has echoed what was typed.
     term.onData((d) => {
       act.key(d[0] === '\x7f' || d[0] === '\x1b' ? 0.1 : 1); // backspace and arrows aren't a frenzy
-      if ((d === '\r' || d === '\n') && /^\s*nyx(\s|$)/i.test(p.line)) { // `nyx <message>` is for her, not the shell
-        window.gibson.write(id, '\x03');                  // cancel the line in the shell
-        nyxChat(p, p.line.trim().slice(3).trim()); p.line = '';
+      const enter = d === '\r' || d === '\n';
+      const cmd = enter ? typedLine(p) || p.line.trim() : '';
+      if (enter && /^nyx(\s|$)/i.test(cmd)) { // `nyx <message>` is for her, not the shell
+        window.gibson.write(id, '\x03');       // cancel the line in the shell
+        nyxChat(p, cmd.slice(3).trim()); p.line = '';
         return;
       }
       window.gibson.write(id, d);
-      if (d === '\r') { onCommand(p, p.line); p.line = ''; }
+      if (d === '\r') { onCommand(p, cmd); p.line = ''; }
       else if (d === '\x7f') p.line = p.line.slice(0, -1);
       else if (d === '\x03') p.line = '';
       else if (d[0] !== '\x1b') p.line += d.replace(/[\x00-\x1f]/g, '');
@@ -88,6 +91,17 @@
     p.el.style.setProperty('--term-alpha', p.opacity = cfg.opacity ?? 0.86);
     t.panes.push(p);
     return p;
+  }
+  // The command line as the screen shows it: the cursor's row plus any rows it wrapped from,
+  // up to the cursor (PSReadLine draws its grey predictions to the right of it). The prompt
+  // ends at its first > $ # or % plus a space. null when no prompt is recognised.
+  // ponytail: prompt-shape heuristic; a prompt hook (OSC 133) would be exact.
+  function typedLine(p) {
+    const b = p.term.buffer.active;
+    let y = b.baseY + b.cursorY, text = b.getLine(y).translateToString(true, 0, b.cursorX);
+    while (y > 0 && b.getLine(y).isWrapped) { y--; text = b.getLine(y).translateToString(false) + text; }
+    const m = /^[^>$#%]*[>$#%] (.*)$/.exec(text);
+    return m ? m[1].trim() : null;
   }
   function closePane(p) {
     p.ro.disconnect(); p.term.dispose(); p.el.remove(); window.gibson.close(p.id);

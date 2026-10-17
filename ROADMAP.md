@@ -2,8 +2,8 @@
 
 ## Next
 - Splits other than the fixed layouts (drag to resize, more than four panes).
-- Shell prompt hooks (OSC 7/133) so NYX and the FILESYSTEM world see the real working
-  directory and command, including history recall and tab completion.
+- Shell prompt hooks (OSC 7/133) so the working directory and command line are exact rather than
+  read off the screen (pushd, aliases and scripts that change directory are missed today).
 - A settings screen instead of editing `config.json`.
 - Code-signed builds (Windows Authenticode, Apple notarization) and auto-update.
 - Day-to-day use on Linux and macOS (CI builds and self-checks them; nobody has lived in them yet).

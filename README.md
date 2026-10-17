@@ -9,7 +9,7 @@ suit her mood. A local or hosted LLM can write her lines; without one she has he
 
 ## Status
 
-**0.3.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
+**0.3.1, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
 builds are produced and smoke-tested by CI, but nobody has used them day to day yet.
 
 | | |
@@ -94,7 +94,7 @@ python3`). Optional: [Ollama](https://ollama.com) for NYX's local brain.
    ```
    Expected output:
    ```
-   > gibson@0.3.0 test
+   > gibson@0.3.1 test
    > node test/check.mjs
 
    check: all passed

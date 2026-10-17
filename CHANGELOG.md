@@ -4,6 +4,14 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-17
+
+### Fixed
+- `nyx <message>` recalled from history (Up arrow) or finished with Tab went to the shell, which
+  said "not recognized". The command is now read off the screen at Enter instead of rebuilt from
+  keystrokes, so history recall and tab completion count for `nyx`, for `cd` tracking and for
+  NYX's comments on commands.
+
 ## [0.3.0] - 2026-10-17
 
 ### Added
