@@ -4,6 +4,12 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-17
+
+### Added
+- `Ctrl+Shift+S` (or the right-click menu) hides the scroller along the bottom; the terminal
+  takes the space. Remembered as `scroller` in `config.json`.
+
 ## [0.4.0] - 2026-10-17
 
 ### Added

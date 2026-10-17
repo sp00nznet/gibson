@@ -28,6 +28,7 @@ const DEFAULTS = {
   fontFamily: "'Cascadia Mono', Consolas, 'Courier New', monospace",
   fontSize: 15,
   framed: true,               // false: the terminal fills the window, the scene shows through
+  scroller: true,             // the sine scroller along the bottom
   opacity: 0.86,              // terminal background: 1 solid, 0 see the world straight through
   boot: true,                 // the modem dial-in on startup
   music: { on: true, mode: 'reactive', bpm: 128, volume: 0.55 },
@@ -126,7 +127,7 @@ function listDir(dir) {
   } catch { return []; }
 }
 
-const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'frame' };
+const HOTKEYS = { C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'frame', S: 'scroller' };
 
 // Right-click menu. The page sends its current state; clicks come back as hotkey actions.
 function contextMenu(st) {
@@ -143,6 +144,7 @@ function contextMenu(st) {
     item('Music', 'music', 'M', { type: 'checkbox', checked: st.music }),
     item('Tempo follows activity', 'tempo', 'B', { type: 'checkbox', checked: st.reactive }),
     item('Framed', 'frame', 'F', { type: 'checkbox', checked: st.framed }),
+    item('Scroller', 'scroller', 'S', { type: 'checkbox', checked: st.scroller }),
     item('NYX', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
     item('Matrix rain', 'rain', 'R'),
     { type: 'separator' },
@@ -196,7 +198,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   cfg = loadConfig();
-  if (SHOT) { cfg = { ...demoShell(cfg), framed: true, opacity: 0.86 }; home = demoHome(); } // shots ignore saved view choices
+  if (SHOT) { cfg = { ...demoShell(cfg), framed: true, opacity: 0.86, scroller: true }; home = demoHome(); } // shots ignore saved view choices
   ipcMain.handle('boot', () => ({
     cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined } },
     user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, tabs: TABS, chat: CHAT, unframed: UNFRAMED,
@@ -209,7 +211,7 @@ app.whenReady().then(() => {
   ipcMain.on('pty:line', (_e, id, line) => { const p = panes.get(id); if (p) trackCd(p, line); });
   ipcMain.handle('fs:list', (_e, id) => { const d = (panes.get(id) || { cwd: home }).cwd; return { cwd: SHOT ? 'C:\\GIBSON' : d, entries: listDir(d) }; });
   ipcMain.on('cfg:save', (_e, key, v) => { // view choices remembered across restarts
-    if (!['opacity', 'framed'].includes(key)) return;
+    if (!['opacity', 'framed', 'scroller'].includes(key)) return;
     cfg[key] = v;
     try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u[key] = v; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* config unreadable: keep it for this session */ }
   });

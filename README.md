@@ -9,7 +9,7 @@ suit her mood. A local or hosted LLM can write her lines; without one she has he
 
 ## Status
 
-**0.4.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
+**0.4.1, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux
 builds are produced and smoke-tested by CI, but nobody has used them day to day yet.
 
 | | |
@@ -103,7 +103,7 @@ python3`). Optional: [Ollama](https://ollama.com) for NYX's local brain.
    ```
    Expected output:
    ```
-   > gibson@0.4.0 test
+   > gibson@0.4.1 test
    > node test/check.mjs
 
    check: all passed
@@ -139,6 +139,7 @@ Trip-ups:
 | `Ctrl+Shift+1`..`4` | that many panes in this tab, each its own shell. Shrinking keeps the focused pane |
 | `Ctrl+Shift+O` | this pane's opacity, 100% down to 0% (the world shows through) |
 | `Ctrl+Shift+F` | framed (centred, glowing border) or full window |
+| `Ctrl+Shift+S` | hide or show the scroller along the bottom |
 | `Ctrl+Shift+W` | next world |
 | `Ctrl+Shift+M` | music on/off |
 | `Ctrl+Shift+B` | tempo: follows your activity, or locked at `music.bpm` |
@@ -169,7 +170,7 @@ Worlds change with NYX's mood and with what you do:
 
 `Ctrl+Shift+W` steps through them and the right-click menu picks one.
 
-Opacity and the framed/full-window choice are remembered. The tempo follows your activity
+Opacity, the framed/full-window choice and the scroller are remembered. The tempo follows your activity
 averaged over about 12 seconds (typing, and output scrolling past), so a burst barely moves it
 and a long session drives it up.
 
@@ -186,6 +187,7 @@ Settings live in `config.json`, created on first run (restart to apply):
   "shell": "powershell.exe",
   "boot": true,
   "framed": true,
+  "scroller": true,
   "opacity": 0.86,
   "music": { "on": true, "mode": "reactive", "bpm": 128, "volume": 0.55 },
   "nyx":   { "on": true, "voice": false, "chatter": 0.35 },

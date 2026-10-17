@@ -175,7 +175,7 @@
   if (B.tabs > 1) switchTab(tabs[0]);
 
   // --- NYX --------------------------------------------------------------------
-  const scrollBase = '      GIBSON  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  type  nyx <message>  to talk to her  ctrl+shift+O see-through  ctrl+shift+F frame  right-click for the menu  F11 fullscreen  ::  ';
+  const scrollBase = '      GIBSON  ::  NYX IS WATCHING  ::  greetz to f0rkz, sp00nz and the S1LV3RWAREZ crew  ::  hack the planet  ::  ctrl+shift+M music  ctrl+shift+W world  ctrl+shift+N nyx  ctrl+shift+B tempo mode  ctrl+shift+T new tab  ctrl+tab next tab  ctrl+shift+1-4 panes  type  nyx <message>  to talk to her  ctrl+shift+O see-through  ctrl+shift+F frame  ctrl+shift+S hide this scroller  right-click for the menu  F11 fullscreen  ::  ';
   let scroll = scrollBase;
   const nyx = new Nyx(cfg, {
     info: () => ({ user: B.user, host: B.host, hour: new Date().getHours(), activity: act.level().toFixed(2), cwd: (worldEnv.fs && worldEnv.fs.cwd) || B.cwd }),
@@ -207,6 +207,8 @@
   const setOpacity = (p, o) => { p.opacity = o; p.el.style.setProperty('--term-alpha', o); };
   const setFramed = (on) => { cfg.framed = on; document.body.classList.toggle('unframed', !on); };
   setFramed(cfg.framed !== false && !B.unframed);
+  const setScroller = (on) => { cfg.scroller = on; document.body.classList.toggle('noscroll', !on); };
+  setScroller(cfg.scroller !== false);
   function action(a) {
     const t = focused.term;
     if (a === 'copy') navigator.clipboard.writeText(t.getSelection());
@@ -218,6 +220,7 @@
     else if (a.startsWith('world:')) Worlds.go(a.slice(6));
     else if (a === 'rain') Fx.rain(4);
     else if (a === 'frame') { setFramed(!cfg.framed); window.gibson.save('framed', cfg.framed); }
+    else if (a === 'scroller') { setScroller(!cfg.scroller); window.gibson.save('scroller', cfg.scroller); }
     else if (a === 'opacity' || a.startsWith('opacity:')) {
       const o = a === 'opacity' ? OPACITY[(OPACITY.findIndex((x) => x <= focused.opacity + 0.001) + 1) % OPACITY.length] : Number(a.slice(8));
       setOpacity(focused, o); cfg.opacity = o; window.gibson.save('opacity', o);
@@ -236,7 +239,7 @@
     e.preventDefault();
     const p = tab.panes.find((x) => x.el.contains(e.target)); if (p) p.term.focus();
     window.gibson.menu({
-      selection: !!focused.term.getSelection(), panes: tab.panes.length, tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed,
+      selection: !!focused.term.getSelection(), panes: tab.panes.length, tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
       worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
       music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
     });
