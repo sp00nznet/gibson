@@ -375,7 +375,9 @@
 
   // --- worlds + fx ------------------------------------------------------------
   worldEnv.fs = await window.gibson.listDir(focused.id);
-  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news, packets: cfg.packets !== false, home: B.shot ? [40.7, -74] : null }));
+  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news, packets: cfg.packets !== false, spec: jukeOn() ? juke.spectrum(specBuf) : null, home: B.shot ? [40.7, -74] : null }));
+
+  const specBuf = new Float32Array(48); // the jukebox's spectrum, for the Milkdrop worlds
 
   // --- live data: polled fast while its world is showing, slowly otherwise, so NYX can react ---
   const services = new Set(), hogs = new Map(), titles = new Set();

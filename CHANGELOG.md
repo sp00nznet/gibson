@@ -4,6 +4,15 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-17
+
+### Added
+- Milkdrop-style visualizer worlds: TUNNEL, KALEIDOSCOPE and STARBURST. They follow the jukebox's
+  spectrum (or the synth's beat) and come up when a new track starts.
+- GROUND ZERO: a city after a nuclear war, with a mushroom cloud, fires, ash and a Geiger counter.
+- MEGACITY 2049: a cyberpunk city in the rain, with neon signs, flying traffic and a hologram.
+- MANHATTAN 1995: the skyline at night from a Brooklyn rooftop, with a bridge, river and helicopter.
+
 ## [0.10.2] - 2026-10-17
 
 ### Fixed

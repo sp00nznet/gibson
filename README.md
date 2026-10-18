@@ -74,7 +74,9 @@ is anyone's real machine.
 | ![World news on a globe](docs/screenshots/newsglobe.png) **WORLD NEWS**: headlines pop up where they happened | ![Your traffic on a globe](docs/screenshots/traffic.png) **TRAFFIC MAP**: your connections arcing out from home |
 | ![A keygen](docs/screenshots/keygen.png) **KEYGEN**: serials, greetz, copper bars; when a build finishes | ![The garbage file](docs/screenshots/garbage.png) **THE GARBAGE FILE**: hunted through the Gibson's tree |
 | ![Dialing a BBS](docs/screenshots/dial.png) **`dial 555-0199`**: a BBS in a tab, with a door game | ![The IRC lobby](docs/screenshots/irc.png) **IRC lobby**: #hackers beside your shell (`Ctrl+Shift+I`) |
-| ![Gibson towers](docs/screenshots/towers.png) **GIBSON TOWERS**: flying the glass canyons | |
+| ![Gibson towers](docs/screenshots/towers.png) **GIBSON TOWERS**: flying the glass canyons | ![Milkdrop tunnel](docs/screenshots/milkdrop.png) **MILKDROP**: tunnel, kaleidoscope and starburst presets that follow your music |
+| ![Megacity 2049](docs/screenshots/cyberpunk.png) **MEGACITY 2049**: a spinner through neon, rain and holograms | ![Ground zero](docs/screenshots/ruins.png) **GROUND ZERO**: the city after the bombs, a Geiger counter ticking |
+| ![Manhattan 1995](docs/screenshots/skyline.png) **MANHATTAN 1995**: the skyline from a Brooklyn rooftop | ![Kaleidoscope](docs/screenshots/kaleido.png) **MILKDROP // KALEIDOSCOPE** |
 
 Also in the box: THE GRID, NEON CITY, ORBIT, RAVE WAREHOUSE, GIT GALAXY, HIGHWAY, DEEP SEA,
 PROCESS HIVE, 3D PIPES, 3D MAZE and THE STREET.
@@ -232,11 +234,12 @@ about your taste.
 | FILESYSTEM | you `cd` (towers are the folder's real entries) |
 | GIT GALAXY | any `git` command (your repo's last 150 commits; new ones ignite) |
 | ICE WALL | an error (it cracks open when the next command works) |
-| GIBSON CORE, THE GARBAGE FILE | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
-| RAVE WAREHOUSE, HACK THE PLANET, GIBSON TOWERS | a typing streak (or type `hack the planet`) |
+| GIBSON CORE, THE GARBAGE FILE, GROUND ZERO | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
+| RAVE WAREHOUSE, HACK THE PLANET, GIBSON TOWERS, MEGACITY 2049 | a typing streak (or type `hack the planet`) |
+| MILKDROP (tunnel, kaleidoscope, starburst) | a new track starts in the jukebox |
 | 3D PIPES | a long build (the screensaver while you wait) |
 | KEYGEN | the build finishes |
-| 3D MAZE | you go idle (the screensaver kicks in) |
+| 3D MAZE, MANHATTAN 1995 | you go idle (the screensaver kicks in) |
 | NETWATCH, TRAFFIC MAP | a kind of connection you haven't made this session |
 | PROCESS HIVE | a program hogging the CPU |
 | NEWSWIRE, WORLD NEWS | a fresh headline on your feeds |

@@ -6,7 +6,7 @@
   const MOOD_WORLD = { welcoming: 'grid', tender: 'toasters', curious: 'files', playful: 'cycles', taunting: 'battle', impressed: 'city', bored: 'highway', intense: 'core' };
   // Some events have a world of their own, whatever her mood.
   // A list means one of them, at random.
-  const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: ['core', 'garbage'], ssh: 'core', streak: ['rave', 'hack', 'towers'], compile: 'pipes', done: 'keygen', net: ['net', 'traffic'], hog: 'hive', news: ['news', 'newsglobe'] };
+  const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: ['core', 'garbage', 'ruins'], ssh: 'core', streak: ['rave', 'hack', 'towers', 'cyberpunk'], track: ['milkdrop', 'kaleido', 'starburst'], idle: ['maze', 'skyline'], compile: 'pipes', done: 'keygen', net: ['net', 'traffic'], hog: 'hive', news: ['news', 'newsglobe'] };
 
   const LINES = {
     boot: [

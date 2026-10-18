@@ -13,6 +13,7 @@ const SHOTS = [
   ['keygen', 'keygen', 1], ['garbage', 'garbage', 1], ['towers', 'towers', 1],
   ['irc', 'city', 1, '--irc'], ['dial', 'grid', 1, '--cmd', 'dial 555-0199'],
   ['newsglobe', 'newsglobe', 1], ['traffic', 'traffic', 1], ['hack', 'hack', 1],
+  ['milkdrop', 'milkdrop', 1], ['kaleido', 'kaleido', 1], ['starburst', 'starburst', 1], ['ruins', 'ruins', 1], ['cyberpunk', 'cyberpunk', 1], ['skyline', 'skyline', 1],
 ];
 for (const [name, world, panes, ...extra] of SHOTS) {
   execFileSync(electron, ['.', '--shot', `docs/screenshots/${name}.png`, '--world', world, '--panes', String(panes), '--at', '16', ...extra], { stdio: 'inherit' });
