@@ -24,17 +24,23 @@
     },
   };
   // Tabs each hold 1 to 4 panes. Pane ids are global: main.js keys its shells by them.
-  const tabs = []; let tab = null, focused = null, nextId = 1, dragged = null;
+  const tabs = []; let tab = null, focused = null, nextId = (B.idBase || 0) + 1, dragged = null; // ids are global across windows
   const allPanes = () => tabs.flatMap((t) => t.panes);
 
   // opts: { profile, cwd } for the tab's shells; blank means the default shell in the home folder.
-  function makeTab(opts) {
+  // adopt: pane ids of running shells (a tab torn off another window) instead of new ones.
+  function makeTab(opts, adopt) {
     const t = { panes: [], focused: null, cwdName: '', opts: opts || {}, c: 0.5, r: 0.5, el: document.createElement('div'), btn: document.createElement('button') };
     t.el.className = 'tab n1'; $('termwrap').appendChild(t.el);
     splitters(t);
-    t.btn.className = 'tabbtn'; t.btn.title = 'double-click renames, drag to reorder, middle-click closes';
+    t.btn.className = 'tabbtn'; t.btn.title = 'double-click renames, drag to reorder or out of the window, middle-click closes';
     t.btn.draggable = true; // drag a tab onto another to move it there
     t.btn.ondragstart = (e) => { dragged = t; e.dataTransfer.effectAllowed = 'move'; };
+    t.btn.ondragend = (e) => { // dropped outside the window: the tab gets a window of its own
+      dragged = null;
+      const out = e.screenX < screenX || e.screenX > screenX + outerWidth || e.screenY < screenY || e.screenY > screenY + outerHeight;
+      if (out && e.dataTransfer.dropEffect === 'none') detach(t, e.screenX, e.screenY);
+    };
     t.btn.ondragover = (e) => { if (dragged && dragged !== t) e.preventDefault(); };
     t.btn.ondrop = (e) => {
       e.preventDefault(); if (!dragged || dragged === t) return;
@@ -47,7 +53,9 @@
     t.btn.onauxclick = (e) => { if (e.button === 1) closeTab(t); };
     t.btn.ondblclick = (e) => { if (!e.target.classList.contains('x')) renameTab(t); };
     $('tabs').insertBefore(t.btn, $('newtab'));
-    tabs.push(t); makePane(t, t.opts.from); label(t);
+    tabs.push(t);
+    if (adopt) { for (const id of adopt) makePane(t, null, id); t.el.className = 'tab n' + t.panes.length; } else makePane(t, t.opts.from);
+    label(t);
     window.gibson.listDir(t.panes[0].id).then((fs) => { t.cwdName = baseName(fs.cwd); label(t); });
     return t;
   }
@@ -112,12 +120,21 @@
     tabs.forEach(label);
     switchTab(tab === t || !tabs.includes(tab) ? tabs[Math.min(i, tabs.length - 1)] : tab);
   }
+  // Off into a new window, shells still running: this window lets go without closing them.
+  function detach(t, x, y) {
+    if (tabs.length < 2) return; // the only tab: nothing to tear off
+    window.gibson.detach({ ids: t.panes.map((p) => p.id), c: t.c, r: t.r, opts: t.opts }, x, y);
+    for (const p of t.panes) { p.ro.disconnect(); p.term.dispose(); }
+    const i = tabs.indexOf(t); t.el.remove(); t.btn.remove(); tabs.splice(i, 1);
+    tabs.forEach(label);
+    switchTab(tab === t ? tabs[Math.min(i, tabs.length - 1)] : tab);
+  }
   const stepTab = (d) => switchTab(tabs[(tabs.indexOf(tab) + d + tabs.length) % tabs.length]);
   const baseName = (dir) => dir.split(/[\\/]/).filter(Boolean).pop() || dir;
 
   // from: the pane whose folder the new shell starts in (split from here)
-  function makePane(t, from) {
-    const id = nextId++, el = document.createElement('div');
+  function makePane(t, from, adoptId) {
+    const id = adoptId || nextId++, el = document.createElement('div');
     el.className = 'pane'; t.el.appendChild(el);
     const term = new Terminal(TERM_OPTS), fit = new FitAddon.FitAddon(), search = new SearchAddon.SearchAddon();
     term.loadAddon(fit); term.loadAddon(search);
@@ -128,7 +145,8 @@
     try { const gl = new WebglAddon.WebglAddon(); gl.onContextLoss(() => gl.dispose()); term.loadAddon(gl); } catch { /* DOM renderer is fine */ }
     const chat = document.createElement('div'); chat.className = 'nyxchat'; el.appendChild(chat);
     const p = { id, el, term, search, tab: t, chat, line: '', lastCmd: '', outTail: '', errorSeen: false, lastOut: 0, cmdAt: 0 };
-    window.gibson.open(id, { ...t.opts, from });
+    if (adoptId) window.gibson.adopt(id).then((buf) => { if (buf) term.write(buf); }); // what it showed in the old window
+    else window.gibson.open(id, { ...t.opts, from });
     // Pastes go through the guard, whichever way they arrive (keys, menu, middle click).
     el.addEventListener('paste', (e) => { e.preventDefault(); e.stopImmediatePropagation(); pasteInto(p, e.clipboardData.getData('text/plain')); }, true);
     const doFit = () => { try { fit.fit(); window.gibson.resize(id, term.cols, term.rows); } catch { /* hidden */ } };
@@ -323,7 +341,8 @@
     p.chatHide = setTimeout(() => p.chat.classList.remove('show'), 30000);
   }
 
-  if (B.startTabs.length && !B.shot) { // the saved start tabs
+  if (B.adopt) { const t = makeTab(B.adopt.opts, B.adopt.ids); t.c = B.adopt.c; t.r = B.adopt.r; layout(t); switchTab(t); } // a torn-off tab
+  else if (B.startTabs.length && !B.shot) { // the saved start tabs
     for (const s of B.startTabs) { const t = makeTab({ profile: s.profile, cwd: s.cwd, name: s.name, color: s.color }); if (s.panes > 1) { switchTab(t); setPanes(s.panes); } }
     switchTab(tabs[0]);
   } else switchTab(makeTab());
@@ -589,6 +608,8 @@
     if (tab.panes.length > 1) tab.panes.forEach((p, i) => setOpacity(p, [0.86, 0.55, 0.3, 0.7][i]));
     setTimeout(() => tab.panes.forEach((p, i) => window.gibson.write(p.id, demoCmd(i))), 1500);
     if (B.chat) setTimeout(() => { const t = tab.panes[0].term; for (const ch of `nyx ${B.chat}\r`) t.input(ch); }, 4000); // the real keystroke path
+    if (B.adopt) setTimeout(() => window.gibson.write(tab.panes[0].id, demoCmd(2)), 2000); // the torn-off shell still answers
+    if (B.detach) setTimeout(() => { if (tabs[1]) detach(tabs[1], 200, 200); }, 3500); // --detach: the second tab tears off
     if (B.cmd) setTimeout(() => { const t = tab.panes[0].term; for (const ch of `${B.cmd}\r`) t.input(ch); }, 3000); // a GIBSON command, typed
     act.keys = 30;
     setInterval(() => { act.key(); act.key(); }, 100);

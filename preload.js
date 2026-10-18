@@ -4,6 +4,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('gibson', {
   boot: () => ipcRenderer.invoke('boot'),
   open: (id, opts) => ipcRenderer.send('pty:open', id, opts),
+  adopt: (id) => ipcRenderer.invoke('pty:adopt', id),
+  detach: (tab, x, y) => ipcRenderer.send('tab:detach', tab, x, y),
   close: (id) => ipcRenderer.send('pty:close', id),
   write: (id, d) => ipcRenderer.send('pty:write', id, d),
   resize: (id, c, r) => ipcRenderer.send('pty:resize', id, c, r),

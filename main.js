@@ -26,7 +26,8 @@ const UNFRAMED = argv.includes('--unframed');
 const TABS = Number(arg('--tabs') || 1); // start with this many tabs (screenshots)
 const CHAT = arg('--chat');
 const IRC = argv.includes('--irc');       // shots: open the IRC lobby
-const CMD = arg('--cmd');                 // shots: type this GIBSON command (e.g. "dial 555-0199")
+const CMD = arg('--cmd');
+const DETACH = argv.includes('--detach'); // shots: tear the second tab off into its own window                 // shots: type this GIBSON command (e.g. "dial 555-0199")
 const MUSIC = arg('--music');              // play this folder (the jukebox) instead of the synth                // shots: say this to NYX
 
 const DEFAULTS = {
@@ -186,21 +187,26 @@ function piped(prof, cwd) {
   };
 }
 const BBS = path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), 'bbs', 'bbs.js');
-function spawnShell(id, opts) {
+// A pane's output goes to whichever window holds it now (pane.wc), and the last stretch of it is
+// kept (pane.buf) so a tab torn off into a new window comes up showing what it showed before.
+function spawnShell(id, opts, wc) {
   let pane = panes.get(id);
   if (!pane && opts && opts.bbs) { // `dial <number>`: the BBS, once; hanging up ends it
     const number = String(opts.bbs).replace(/[^\d\-+*#() ]/g, '').slice(0, 20) || '555-0199';
-    pane = { cwd: home, prof: { name: 'BBS', shell: process.execPath, args: [BBS, number], env: { ELECTRON_RUN_AS_NODE: '1', BBS_TTY: '1', BBS_COLS: '80' }, once: true, pipes: true } };
+    pane = { wc, wcId: wc && wc.id, buf: '', cwd: home, prof: { name: 'BBS', shell: process.execPath, args: [BBS, number], env: { ELECTRON_RUN_AS_NODE: '1', BBS_TTY: '1', BBS_COLS: '80' }, once: true, pipes: true } };
     panes.set(id, pane);
   }
   if (!pane) {
     const prof = (!SHOT && findProfile(opts && opts.profile)) || defaultProfile();
     const from = opts && opts.from && cfg.splitHere !== false && panes.get(opts.from); // split from here
     const cwd = [opts && opts.cwd, from && from.cwd, prof.cwd].find(isDir) || home;
-    pane = { cwd, prof: SHOT ? { shell: cfg.shell, args: cfg.shellArgs } : prof };
+    pane = { wc, wcId: wc && wc.id, buf: '', cwd, prof: SHOT ? { shell: cfg.shell, args: cfg.shellArgs } : prof };
     panes.set(id, pane);
   }
-  const send = (d) => win && !win.isDestroyed() && win.webContents.send('pty:data', id, d);
+  const send = (d) => {
+    pane.buf += d; if (pane.buf.length > 400000) pane.buf = pane.buf.slice(-200000);
+    if (pane.wc && !pane.wc.isDestroyed()) pane.wc.send('pty:data', id, d);
+  };
   let term;
   try {
     if (pane.prof.pipes) term = pane.term = piped(pane.prof, pane.cwd); else term = pane.term = pty.spawn(pane.prof.shell, pane.prof.args || [], {
@@ -285,7 +291,7 @@ const shellItems = (act) => profiles.map((p) => ({ label: p.name + (p.name === d
 
 // Right-click menu. The page sends its current state; clicks come back as hotkey actions.
 function contextMenu(st) {
-  const act = (a) => () => win.webContents.send('hotkey', a);
+  const act = (a) => () => toMenuWindow('hotkey', a);
   const item = (label, a, key, extra) => ({ label, click: act(a), accelerator: key && 'Ctrl+Shift+' + key, registerAccelerator: false, ...extra });
   return Menu.buildFromTemplate([
     item('Copy', 'copy', 'C', { enabled: st.selection }), item('Paste', 'paste', 'V'),
@@ -368,9 +374,18 @@ function setIrcMode(mode) {
   win.webContents.send('hotkey', 'irc:mode:' + mode);
 }
 
-function createWindow() {
-  win = new BrowserWindow({
-    width: SHOT ? 1920 : 1600, height: SHOT ? 1080 : 960, minWidth: 900, minHeight: 600,
+// The window that opened the last menu: its picks go back to it.
+let menuWc = null;
+const toMenuWindow = (ch, a) => (menuWc && !menuWc.isDestroyed() ? menuWc : win.webContents).send(ch, a);
+const winOf = (e) => BrowserWindow.fromWebContents(e.sender) || win;
+
+// The first window is the main one (music, IRC, news, quake). More come from tabs dragged out of
+// it (extra.adopt: the tab and its running shells); each numbers its panes from its own idBase.
+const extras = new Map(); let nextBase = 0;
+function createWindow(extra) {
+  const w = new BrowserWindow({
+    width: SHOT ? 1920 : extra ? 1100 : 1600, height: SHOT ? 1080 : extra ? 700 : 960, minWidth: 900, minHeight: 600,
+    ...(extra && !SHOT && extra.x != null ? { x: Math.round(extra.x), y: Math.round(extra.y) } : {}),
     useContentSize: true, enableLargerThanScreen: !!SHOT,
     backgroundColor: '#000000', autoHideMenuBar: true, title: 'GIBSON', icon: path.join(__dirname, 'build', 'icon.png'),
     show: !SHOT,
@@ -380,9 +395,41 @@ function createWindow() {
       backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required',
     },
   });
-  win.setMenuBarVisibility(false);
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  // Hotkeys are caught here, before xterm or the page can swallow them.
+  if (!extra) win = w;
+  const wcId = w.webContents.id;
+  extras.set(wcId, { idBase: extra ? (nextBase += 100000) : 0, adopt: extra ? extra.adopt : null });
+  w.on('closed', () => { // its shells go with it; the main window takes the rest along
+    extras.delete(wcId);
+    for (const [id, p] of panes) if (p.wcId === wcId) killShell(id);
+    if (w === win) for (const o of BrowserWindow.getAllWindows()) o.close();
+  });
+  w.setMenuBarVisibility(false);
+  w.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  hotkeys(w);
+  w.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  if (extra) { if (SHOT) { w.webContents.setFrameRate(30); w.setContentSize(1920, 1080); } return w; }
+  if (SHOT) {
+    win.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 'warning') console.log('page:', e.message); });
+    win.webContents.setFrameRate(30);
+    win.setContentSize(1920, 1080); // offscreen windows still get clamped to the screen otherwise
+    setTimeout(async () => {
+      const others = BrowserWindow.getAllWindows().filter((o) => o !== win);
+      for (const o of [win, ...others]) { // the main window, then any torn-off ones as name-2.png, name-3.png...
+        const file = path.resolve(SHOT).replace(/\.png$/i, '') + (o === win ? '' : `-${others.indexOf(o) + 2}`) + '.png';
+        const img = await o.webContents.capturePage();
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, img.toPNG());
+        console.log('shot:', file);
+      }
+      for (const id of [...panes.keys()]) killShell(id);
+      setTimeout(() => app.exit(0), 1000); // let node-pty finish closing ConPTY, or Electron crashes on exit
+    }, SHOT_AT * 1000);
+  }
+  return w;
+}
+
+// Hotkeys are caught here, before xterm or the page can swallow them. Each window gets its own.
+function hotkeys(win) {
   win.webContents.on('before-input-event', (e, i) => {
     if (i.type !== 'keyDown') return;
     const k = i.key.length === 1 ? i.key.toUpperCase() : i.key;
@@ -394,20 +441,6 @@ function createWindow() {
     if (tabKey) { e.preventDefault(); return win.webContents.send('hotkey', tabKey); }
     if (k === 'F11' || (i.control && i.shift && HOTKEYS[k])) { e.preventDefault(); win.webContents.send('hotkey', k === 'F11' ? 'fullscreen' : HOTKEYS[k]); }
   });
-  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
-  if (SHOT) {
-    win.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 'warning') console.log('page:', e.message); });
-    win.webContents.setFrameRate(30);
-    win.setContentSize(1920, 1080); // offscreen windows still get clamped to the screen otherwise
-    setTimeout(async () => {
-      const img = await win.webContents.capturePage();
-      fs.mkdirSync(path.dirname(path.resolve(SHOT)), { recursive: true });
-      fs.writeFileSync(path.resolve(SHOT), img.toPNG());
-      console.log('shot:', path.resolve(SHOT));
-      for (const id of [...panes.keys()]) killShell(id);
-      setTimeout(() => app.exit(0), 1000); // let node-pty finish closing ConPTY, or Electron crashes on exit
-    }, SHOT_AT * 1000);
-  }
 }
 
 // Registered before ready: streaming lets <audio> seek in big files.
@@ -419,13 +452,31 @@ app.whenReady().then(() => {
   profiles = detectShells();
   for (const p of cfg.profiles || []) if (p && p.name && p.shell) { const i = profiles.findIndex((x) => x.name === p.name); if (i >= 0) profiles[i] = p; else profiles.push(p); }
   if (SHOT) { cfg = { ...demoShell(cfg), irc: { ...cfg.irc, mode: 'fake' }, ircOpen: false, eggs: false, startupTabs: [], world: '', nyxWorlds: true, cigarette: true, framed: true, opacity: 0.86, scroller: true, logo: true, music: MUSIC ? cfg.music : { ...cfg.music, source: 'synth' } }; home = demoHome(); } // shots ignore saved view choices
-  ipcMain.handle('boot', () => ({
-    cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined }, irc: { ...cfg.irc, password: undefined } },
+  ipcMain.handle('boot', (e) => {
+    const x = extras.get(e.sender.id) || { idBase: 0 }, torn = !!x.adopt;
+    return {
+    // a torn-off window: no dial-in, no music (the main window plays it), no IRC, no start tabs
+    cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined }, irc: { ...cfg.irc, password: undefined }, ...(torn ? { boot: false, ircOpen: false } : {}) },
+    idBase: x.idBase, adopt: x.adopt || null, detach: DETACH && !torn,
     user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, tabs: TABS, chat: CHAT, unframed: UNFRAMED,
     startTabs: cfg.startupTabs, defaults: { fontSize: DEFAULTS.fontSize }, defaultShell: SHOT ? '' : defaultProfile().name,
-    shot: !!SHOT, world: WORLD, irc: IRC, cmd: CMD, mute: MUTE, bootShot: argv.includes('--boot'),
-  }));
-  ipcMain.on('pty:open', (_e, id, opts) => { if (!panes.has(id)) spawnShell(id, opts); });
+    shot: !!SHOT, world: WORLD, irc: IRC && !torn, cmd: torn ? null : CMD, mute: MUTE || torn, bootShot: argv.includes('--boot'),
+    ...(torn ? { startTabs: [], panes: 1, tabs: 1, chat: null } : {}),
+    };
+  });
+  ipcMain.on('pty:open', (e, id, opts) => { if (!panes.has(id)) spawnShell(id, opts, e.sender); });
+  // A tab dragged out of its window: its shells keep running, output piles up in their buffers
+  // until the new window adopts them (pty:adopt hands over the buffer and the live feed at once).
+  ipcMain.on('tab:detach', (_e, tab, x, y) => {
+    const ids = (tab && Array.isArray(tab.ids) ? tab.ids : []).filter((id) => panes.has(id)).slice(0, 4);
+    if (!ids.length) return;
+    for (const id of ids) Object.assign(panes.get(id), { wc: null, wcId: null });
+    createWindow({ adopt: { ids, c: Number(tab.c) || 0.5, r: Number(tab.r) || 0.5, opts: tab.opts || {} }, x: x - 120, y: y - 20 });
+  });
+  ipcMain.handle('pty:adopt', (e, id) => {
+    const p = panes.get(id); if (!p || p.wcId) return null; // only an orphaned pane can be taken
+    Object.assign(p, { wc: e.sender, wcId: e.sender.id }); return p.buf;
+  });
   ipcMain.on('pty:close', (_e, id) => killShell(id));
   ipcMain.on('pty:write', (_e, id, d) => { const p = panes.get(id); if (p && p.term) p.term.write(d); });
   ipcMain.on('pty:resize', (_e, id, c, r) => { try { panes.get(id).term.resize(c, r); } catch { /* shell restarting */ } });
@@ -459,7 +510,7 @@ app.whenReady().then(() => {
   const linkPath = (id, file) => path.resolve((panes.get(id) || { cwd: home }).cwd, file.replace(/^~(?=[\\/])/, os.homedir()));
   ipcMain.handle('link:check', (_e, id, files) => files.map((f) => !SHOT && exists(linkPath(id, f))));
   ipcMain.on('link:open', (_e, id, file, line, col) => openInEditor(linkPath(id, file), line || 1, col || 1));
-  ipcMain.on('menu:shells', () => Menu.buildFromTemplate(shellItems((a) => () => win.webContents.send('hotkey', a))).popup({ window: win }));
+  ipcMain.on('menu:shells', (e) => { const wc = e.sender; Menu.buildFromTemplate(shellItems((a) => () => wc.send('hotkey', a))).popup({ window: winOf(e) }); });
   ipcMain.handle('git:log', (_e, id) => gitLog((panes.get(id) || { cwd: home }).cwd));
   ipcMain.handle('sys:net', () => (SHOT ? DEMO_NET() : sys.netConns()));
   ipcMain.handle('sys:procs', () => (SHOT ? DEMO_PROCS() : sys.procs()));
@@ -480,10 +531,10 @@ app.whenReady().then(() => {
       return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
     });
   });
-  ipcMain.on('menu', (_e, st) => contextMenu(st).popup({ window: win }));
+  ipcMain.on('menu', (e, st) => { menuWc = e.sender; contextMenu(st).popup({ window: winOf(e) }); });
   ipcMain.handle('nyx:llm', (_e, event) => llmLine(cfg.llm, event).catch(() => null));
-  ipcMain.on('win:focus', () => { if (win.isMinimized()) win.restore(); win.show(); win.focus(); });
-  ipcMain.on('win:fullscreen', () => win.setFullScreen(!win.isFullScreen()));
+  ipcMain.on('win:focus', (e) => { const w = winOf(e); if (w.isMinimized()) w.restore(); w.show(); w.focus(); });
+  ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); w.setFullScreen(!w.isFullScreen()); });
   // NEWSWIRE: fetch the feeds now and every news.minutes, push headlines to the page.
   const pushNews = async () => {
     const items = SHOT ? DEMO_NEWS() : await sys.fetchFeeds(cfg.news.feeds);

@@ -24,7 +24,7 @@ window, and a Da Vinci red alert when you type `rm -rf`.
 It is mostly for fun. But some of it is genuinely handy:
 
 - **It's a proper terminal.** PowerShell, cmd, bash, zsh, each WSL distro; tabs you can rename,
-  colour, drag and save; up to four resizable panes per tab; find in scrollback; type into every
+  colour, drag, tear off into their own windows and save; up to four resizable panes per tab; find in scrollback; type into every
   pane at once; clickable `file:line` links that open your editor; a ping when a long command
   finishes while you're elsewhere; a paste guard; a quake-style summon key.
 - **NETWATCH** draws every live TCP connection your machine has, labelled by service. A new kind
@@ -77,6 +77,10 @@ is anyone's real machine.
 | ![Gibson towers](docs/screenshots/towers.png) **GIBSON TOWERS**: flying the glass canyons | ![Milkdrop tunnel](docs/screenshots/milkdrop.png) **MILKDROP**: tunnel, kaleidoscope and starburst presets that follow your music |
 | ![Megacity 2049](docs/screenshots/cyberpunk.png) **MEGACITY 2049**: a spinner through neon, rain and holograms | ![Ground zero](docs/screenshots/ruins.png) **GROUND ZERO**: the city after the bombs, a Geiger counter ticking |
 | ![Manhattan 1995](docs/screenshots/skyline.png) **MANHATTAN 1995**: the skyline from a Brooklyn rooftop | ![Kaleidoscope](docs/screenshots/kaleido.png) **MILKDROP // KALEIDOSCOPE** |
+| ![Mystify](docs/screenshots/mystify.png) **MYSTIFY**: two polygons and their echoes, bouncing | ![Lunatic Fringe](docs/screenshots/fringe.png) **LUNATIC FRINGE**: a vector shooter that plays itself |
+| ![Strange attractor](docs/screenshots/attractor.png) **STRANGE ATTRACTOR**: Lorenz, Aizawa, Thomas, Halvorsen, as glowing filaments | ![DNA helix](docs/screenshots/helix.png) **DNA HELIX**: base pairs, and the Gibson's genome in hex |
+| ![3D Flowerbox](docs/screenshots/flowerbox.png) **3D FLOWERBOX**: cube to sphere to flower, with echoes | ![Nocturne](docs/screenshots/nocturne.png) **NOCTURNE**: eyes in the dark, watching your terminal |
+| ![Game of Life](docs/screenshots/life.png) **GAME OF LIFE**: Conway on a plane, the old cells rising | |
 
 Also in the box: THE GRID, NEON CITY, ORBIT, RAVE WAREHOUSE, GIT GALAXY, HIGHWAY, DEEP SEA,
 PROCESS HIVE, 3D PIPES, 3D MAZE and THE STREET.
@@ -163,7 +167,7 @@ Everything below is also on the **right-click menu**.
 | `Ctrl+Shift+T` / `Ctrl+Shift+X` | new tab / close tab (or the `+` button, and the `x` on each tab or a middle-click) |
 | `▾` next to `+` | new tab with another shell: PowerShell, PowerShell 7, cmd, WSL, Git Bash, whatever is installed |
 | double-click a tab | rename it (Enter keeps it, Esc backs out, empty goes back to the folder name); also right-click > Rename tab |
-| drag a tab | move it; right-click > Tab colour to colour it |
+| drag a tab | move it; drop it outside the window and it opens in a window of its own, shells still running. Right-click > Tab colour to colour it |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | next / previous tab (also `Ctrl+PageDown` / `Ctrl+PageUp`) |
 | `Ctrl+Shift+1`..`4` | that many panes in this tab, opening in the focused pane's folder. Drag the gaps to resize; right-click > Panes > Even out |
 | `Ctrl+Shift+Z` | zoom the focused pane to fill the tab, and back |
@@ -237,13 +241,15 @@ about your taste.
 | GIBSON CORE, THE GARBAGE FILE, GROUND ZERO | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
 | RAVE WAREHOUSE, HACK THE PLANET, GIBSON TOWERS, MEGACITY 2049 | a typing streak (or type `hack the planet`) |
 | MILKDROP (tunnel, kaleidoscope, starburst) | a new track starts in the jukebox |
-| 3D PIPES | a long build (the screensaver while you wait) |
+| 3D PIPES, DNA HELIX | a long build (the screensaver while you wait) |
 | KEYGEN | the build finishes |
-| 3D MAZE, MANHATTAN 1995 | you go idle (the screensaver kicks in) |
+| 3D MAZE, MANHATTAN 1995, MYSTIFY, 3D FLOWERBOX, GAME OF LIFE, NOCTURNE | you go idle (the screensaver kicks in) |
 | NETWATCH, TRAFFIC MAP | a kind of connection you haven't made this session |
 | PROCESS HIVE | a program hogging the CPU |
 | NEWSWIRE, WORLD NEWS | a fresh headline on your feeds |
-| LIGHT CYCLES | NYX feeling playful |
+| LIGHT CYCLES, LUNATIC FRINGE | NYX feeling playful |
+| NOCTURNE | NYX feeling taunting (she is watching) |
+| STRANGE ATTRACTOR | NYX feeling impressed |
 | HIGHWAY, NEON CITY, DEEP SPACE, THE GRID | NYX's other moods |
 | FLYING TOASTERS | NYX feeling tender, or the menu |
 | DATASTREAM, ORBIT, DEEP SEA, THE STREET, BATTLEZONE | the menu or `Ctrl+Shift+W` |

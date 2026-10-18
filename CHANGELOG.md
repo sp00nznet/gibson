@@ -4,6 +4,16 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-18
+
+### Added
+- Drag a tab out of the window and it opens in a window of its own, with its shells still
+  running and its recent output carried over. Closing that window closes its shells.
+- Worlds after the classic screensavers: MYSTIFY, LUNATIC FRINGE (a vector shooter that plays
+  itself), STRANGE ATTRACTOR (Lorenz, Aizawa, Thomas, Halvorsen), DNA HELIX, 3D FLOWERBOX,
+  NOCTURNE (eyes in the dark, watching your terminal) and GAME OF LIFE in 3D.
+- The idle screensaver picks from more of them, and long builds can show the DNA helix.
+
 ## [0.11.0] - 2026-10-17
 
 ### Added
