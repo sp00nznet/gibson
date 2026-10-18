@@ -24,7 +24,7 @@ window, and a Da Vinci red alert when you type `rm -rf`.
 It is mostly for fun. But some of it is genuinely handy:
 
 - **It's a proper terminal.** PowerShell, cmd, bash, zsh, each WSL distro; tabs you can rename,
-  colour, drag, tear off into their own windows and save; up to four resizable panes per tab; find in scrollback; type into every
+  colour, drag, tear off into their own windows (or drop into another one) and save; up to four resizable panes per tab; find in scrollback; type into every
   pane at once; clickable `file:line` links that open your editor; a ping when a long command
   finishes while you're elsewhere; a paste guard; a quake-style summon key.
 - **NETWATCH** draws every live TCP connection your machine has, labelled by service. A new kind

@@ -4,6 +4,13 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-18
+
+### Added
+- Drop a tab onto another GIBSON window and it moves there, shells still running and output
+  carried over. Moving the last tab out of a torn-off window closes that window behind it.
+- `--rejoin` shot flag: with `--detach`, drops the torn-off tab back into the main window.
+
 ## [0.12.0] - 2026-10-18
 
 ### Added

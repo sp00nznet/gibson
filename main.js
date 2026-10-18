@@ -27,7 +27,8 @@ const TABS = Number(arg('--tabs') || 1); // start with this many tabs (screensho
 const CHAT = arg('--chat');
 const IRC = argv.includes('--irc');       // shots: open the IRC lobby
 const CMD = arg('--cmd');
-const DETACH = argv.includes('--detach'); // shots: tear the second tab off into its own window                 // shots: type this GIBSON command (e.g. "dial 555-0199")
+const DETACH = argv.includes('--detach'); // shots: tear the second tab off into its own window
+const REJOIN = argv.includes('--rejoin'); // shots: ...then drop it back into the main window                 // shots: type this GIBSON command (e.g. "dial 555-0199")
 const MUSIC = arg('--music');              // play this folder (the jukebox) instead of the synth                // shots: say this to NYX
 
 const DEFAULTS = {
@@ -457,7 +458,7 @@ app.whenReady().then(() => {
     return {
     // a torn-off window: no dial-in, no music (the main window plays it), no IRC, no start tabs
     cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined }, irc: { ...cfg.irc, password: undefined }, ...(torn ? { boot: false, ircOpen: false } : {}) },
-    idBase: x.idBase, adopt: x.adopt || null, detach: DETACH && !torn,
+    idBase: x.idBase, adopt: x.adopt || null, detach: DETACH && !torn, rejoin: REJOIN && torn,
     user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, tabs: TABS, chat: CHAT, unframed: UNFRAMED,
     startTabs: cfg.startupTabs, defaults: { fontSize: DEFAULTS.fontSize }, defaultShell: SHOT ? '' : defaultProfile().name,
     shot: !!SHOT, world: WORLD, irc: IRC && !torn, cmd: torn ? null : CMD, mute: MUTE || torn, bootShot: argv.includes('--boot'),
@@ -465,13 +466,23 @@ app.whenReady().then(() => {
     };
   });
   ipcMain.on('pty:open', (e, id, opts) => { if (!panes.has(id)) spawnShell(id, opts, e.sender); });
-  // A tab dragged out of its window: its shells keep running, output piles up in their buffers
-  // until the new window adopts them (pty:adopt hands over the buffer and the live feed at once).
-  ipcMain.on('tab:detach', (_e, tab, x, y) => {
+  // A tab dragged out of its window: dropped on another GIBSON window it moves there, on the desktop
+  // it gets a new window. Its shells keep running; output piles up in their buffers until the other
+  // window adopts them (pty:adopt hands over the buffer and the live feed at once). A window's last
+  // tab can only move into another window, and that window closes behind it (never the main one).
+  ipcMain.handle('tab:detach', (e, tab, x, y) => {
     const ids = (tab && Array.isArray(tab.ids) ? tab.ids : []).filter((id) => panes.has(id)).slice(0, 4);
-    if (!ids.length) return;
+    if (!ids.length) return false;
+    const src = winOf(e), pt = SHOT ? { x, y } : screen.getCursorScreenPoint();
+    const inside = (b) => pt.x >= b.x && pt.x < b.x + b.width && pt.y >= b.y && pt.y < b.y + b.height;
+    const to = BrowserWindow.getAllWindows().find((o) => o !== src && !o.isDestroyed() && o.isVisible() && inside(o.getBounds()))
+      || (SHOT && tab.into ? BrowserWindow.getAllWindows().find((o) => o !== src) : null);
+    if (tab.last && (!to || src === win)) return false;
     for (const id of ids) Object.assign(panes.get(id), { wc: null, wcId: null });
-    createWindow({ adopt: { ids, c: Number(tab.c) || 0.5, r: Number(tab.r) || 0.5, opts: tab.opts || {} }, x: x - 120, y: y - 20 });
+    const adopt = { ids, c: Number(tab.c) || 0.5, r: Number(tab.r) || 0.5, opts: tab.opts || {} };
+    if (to) { to.webContents.send('tab:adopt', adopt); to.focus(); } else createWindow({ adopt, x: pt.x - 120, y: pt.y - 20 });
+    if (tab.last) setTimeout(() => src.close(), 50);
+    return true;
   });
   ipcMain.handle('pty:adopt', (e, id) => {
     const p = panes.get(id); if (!p || p.wcId) return null; // only an orphaned pane can be taken

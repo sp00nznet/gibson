@@ -33,7 +33,7 @@
     const t = { panes: [], focused: null, cwdName: '', opts: opts || {}, c: 0.5, r: 0.5, el: document.createElement('div'), btn: document.createElement('button') };
     t.el.className = 'tab n1'; $('termwrap').appendChild(t.el);
     splitters(t);
-    t.btn.className = 'tabbtn'; t.btn.title = 'double-click renames, drag to reorder or out of the window, middle-click closes';
+    t.btn.className = 'tabbtn'; t.btn.title = 'double-click renames, drag to reorder, out of the window or onto another, middle-click closes';
     t.btn.draggable = true; // drag a tab onto another to move it there
     t.btn.ondragstart = (e) => { dragged = t; e.dataTransfer.effectAllowed = 'move'; };
     t.btn.ondragend = (e) => { // dropped outside the window: the tab gets a window of its own
@@ -120,11 +120,13 @@
     tabs.forEach(label);
     switchTab(tab === t || !tabs.includes(tab) ? tabs[Math.min(i, tabs.length - 1)] : tab);
   }
-  // Off into a new window, shells still running: this window lets go without closing them.
-  function detach(t, x, y) {
-    if (tabs.length < 2) return; // the only tab: nothing to tear off
-    window.gibson.detach({ ids: t.panes.map((p) => p.id), c: t.c, r: t.r, opts: t.opts }, x, y);
+  // Off into another window (or a new one), shells still running: this window lets go without
+  // closing them. Main says no for the only tab unless it landed on another window.
+  async function detach(t, x, y, into) {
+    const ok = await window.gibson.detach({ ids: t.panes.map((p) => p.id), c: t.c, r: t.r, opts: t.opts, last: tabs.length < 2, into }, x, y);
+    if (!ok || !tabs.includes(t)) return;
     for (const p of t.panes) { p.ro.disconnect(); p.term.dispose(); }
+    if (tabs.length < 2) return; // the window closes behind it
     const i = tabs.indexOf(t); t.el.remove(); t.btn.remove(); tabs.splice(i, 1);
     tabs.forEach(label);
     switchTab(tab === t ? tabs[Math.min(i, tabs.length - 1)] : tab);
@@ -341,7 +343,9 @@
     p.chatHide = setTimeout(() => p.chat.classList.remove('show'), 30000);
   }
 
-  if (B.adopt) { const t = makeTab(B.adopt.opts, B.adopt.ids); t.c = B.adopt.c; t.r = B.adopt.r; layout(t); switchTab(t); } // a torn-off tab
+  const adoptTab = (a) => { const t = makeTab(a.opts, a.ids); t.c = a.c; t.r = a.r; layout(t); switchTab(t); };
+  window.gibson.onAdopt(adoptTab); // a tab dropped here from another window
+  if (B.adopt) adoptTab(B.adopt); // a torn-off tab
   else if (B.startTabs.length && !B.shot) { // the saved start tabs
     for (const s of B.startTabs) { const t = makeTab({ profile: s.profile, cwd: s.cwd, name: s.name, color: s.color }); if (s.panes > 1) { switchTab(t); setPanes(s.panes); } }
     switchTab(tabs[0]);
@@ -609,6 +613,7 @@
     setTimeout(() => tab.panes.forEach((p, i) => window.gibson.write(p.id, demoCmd(i))), 1500);
     if (B.chat) setTimeout(() => { const t = tab.panes[0].term; for (const ch of `nyx ${B.chat}\r`) t.input(ch); }, 4000); // the real keystroke path
     if (B.adopt) setTimeout(() => window.gibson.write(tab.panes[0].id, demoCmd(2)), 2000); // the torn-off shell still answers
+    if (B.rejoin) setTimeout(() => detach(tab, 0, 0, true), 4000); // --rejoin: and back it goes
     if (B.detach) setTimeout(() => { if (tabs[1]) detach(tabs[1], 200, 200); }, 3500); // --detach: the second tab tears off
     if (B.cmd) setTimeout(() => { const t = tab.panes[0].term; for (const ch of `${B.cmd}\r`) t.input(ch); }, 3000); // a GIBSON command, typed
     act.keys = 30;
