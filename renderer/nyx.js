@@ -3,10 +3,10 @@
 // below are the whole personality when no LLM is configured; with one, the model
 // writes the line and these are the fallback.
 (function (root) {
-  const MOOD_WORLD = { welcoming: 'grid', tender: 'toasters', curious: 'files', playful: ['cycles', 'fringe'], taunting: ['battle', 'nocturne', 'deathmatch'], impressed: ['city', 'attractor'], bored: 'highway', intense: 'core' };
+  const MOOD_WORLD = { welcoming: 'grid', tender: 'toasters', curious: 'files', playful: ['cycles', 'fringe', 'rocks', 'stunt'], taunting: ['battle', 'nocturne', 'deathmatch'], impressed: ['city', 'attractor'], bored: 'highway', intense: 'core' };
   // Some events have a world of their own, whatever her mood.
   // A list means one of them, at random.
-  const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: ['core', 'garbage', 'ruins'], ssh: 'core', streak: ['rave', 'hack', 'towers', 'cyberpunk', 'deathmatch', 'endless', 'antigrav'], track: ['milkdrop', 'kaleido', 'starburst'], idle: ['maze', 'skyline', 'mystify', 'flowerbox', 'life', 'nocturne'], compile: ['pipes', 'helix'], done: 'keygen', net: ['net', 'traffic'], hog: 'hive', news: ['news', 'newsglobe'] };
+  const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: ['core', 'garbage', 'ruins'], ssh: 'core', streak: ['rave', 'hack', 'towers', 'cyberpunk', 'deathmatch', 'endless', 'antigrav', 'tube', 'trench'], track: ['milkdrop', 'kaleido', 'starburst'], idle: ['maze', 'skyline', 'mystify', 'flowerbox', 'life', 'nocturne', 'lander', 'trader'], compile: ['pipes', 'helix'], done: 'keygen', net: ['net', 'traffic'], hog: 'hive', news: ['news', 'newsglobe'] };
 
   const LINES = {
     boot: [

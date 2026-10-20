@@ -14,7 +14,7 @@ const SHOTS = [
   ['irc', 'city', 1, '--irc'], ['dial', 'grid', 1, '--cmd', 'dial 555-0199'],
   ['newsglobe', 'newsglobe', 1], ['traffic', 'traffic', 1], ['hack', 'hack', 1],
   ['milkdrop', 'milkdrop', 1], ['kaleido', 'kaleido', 1], ['starburst', 'starburst', 1], ['ruins', 'ruins', 1], ['cyberpunk', 'cyberpunk', 1], ['skyline', 'skyline', 1],
-  ['mystify', 'mystify', 1], ['fringe', 'fringe', 1], ['attractor', 'attractor', 1], ['helix', 'helix', 1], ['flowerbox', 'flowerbox', 1], ['nocturne', 'nocturne', 1], ['life', 'life', 1], ['deathmatch', 'deathmatch', 1], ['endless', 'endless', 1], ['antigrav', 'antigrav', 1],
+  ['mystify', 'mystify', 1], ['fringe', 'fringe', 1], ['attractor', 'attractor', 1], ['helix', 'helix', 1], ['flowerbox', 'flowerbox', 1], ['nocturne', 'nocturne', 1], ['life', 'life', 1], ['deathmatch', 'deathmatch', 1], ['endless', 'endless', 1], ['antigrav', 'antigrav', 1], ['tube', 'tube', 1], ['trench', 'trench', 1], ['trader', 'trader', 1], ['rocks', 'rocks', 1], ['lander', 'lander', 1], ['stunt', 'stunt', 1],
 ];
 for (const [name, world, panes, ...extra] of SHOTS) {
   execFileSync(electron, ['.', '--shot', `docs/screenshots/${name}.png`, '--world', world, '--panes', String(panes), '--at', '16', ...extra], { stdio: 'inherit' });

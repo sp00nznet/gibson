@@ -4,6 +4,18 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-19
+
+### Added
+- Six worlds after the wireframe arcade classics, all playing themselves:
+  - VECTOR TUBE: a claw on the rim of a tube that changes shape every level, enemies climbing up.
+  - TRENCH RUN: turrets, catwalks, then the exhaust port and the station going up.
+  - FREE TRADER: pirates, docking with a rotating station, hyperspace, trading; scanner in the margin.
+  - ROCK FIELD: asteroids in 3D, splitting as they're shot, a saucer now and then.
+  - LUNAR LANDER: an autopilot that usually lands on the pads (and sometimes doesn't).
+  - STUNT TRACK: a raised track with jumps, a rival, damage and a crane for when you fall off.
+  A failed command hurts in each (a grab, a shield hit, a crash, a bad landing).
+
 ## [0.15.1] - 2026-10-19
 
 ### Changed
