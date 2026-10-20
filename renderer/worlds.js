@@ -19,7 +19,7 @@
     x -= cam.x; y -= cam.y; z -= cam.z;
     const x1 = x * cy - z * sy, z1 = x * sy + z * cy;
     const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
-    return sr ? [x1 * cr - y2 * sr, x1 * sr + y2 * cr, z2] : [x1, y2, z2]; // roll: only ZERO SET leans
+    return sr ? [x1 * cr - y2 * sr, x1 * sr + y2 * cr, z2] : [x1, y2, z2]; // roll: the anti-grav worlds lean
   }
   const NEAR = 0.3;
   // A segment in world space. fog: distance where it fades out.

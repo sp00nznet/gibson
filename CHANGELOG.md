@@ -4,6 +4,12 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-19
+
+### Changed
+- The anti-grav worlds drop the ZERO SET name and two of their modes: ENDLESS ROAD (`endless`)
+  and ANTI-GRAV RACE (`antigrav`) stay; time trial and elimination are gone.
+
 ## [0.15.0] - 2026-10-19
 
 ### Added

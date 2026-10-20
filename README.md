@@ -81,7 +81,7 @@ is anyone's real machine.
 | ![Strange attractor](docs/screenshots/attractor.png) **STRANGE ATTRACTOR**: Lorenz, Aizawa, Thomas, Halvorsen, as glowing filaments | ![DNA helix](docs/screenshots/helix.png) **DNA HELIX**: base pairs, and the Gibson's genome in hex |
 | ![3D Flowerbox](docs/screenshots/flowerbox.png) **3D FLOWERBOX**: cube to sphere to flower, with echoes | ![Nocturne](docs/screenshots/nocturne.png) **NOCTURNE**: eyes in the dark, watching your terminal |
 | ![Game of Life](docs/screenshots/life.png) **GAME OF LIFE**: Conway on a plane, the old cells rising | ![Deathmatch](docs/screenshots/deathmatch.png) **DEATHMATCH**: a wireframe arena shooter that plays itself behind you |
-| ![ZERO SET continuum](docs/screenshots/zeroset.png) **ZERO SET // CONTINUUM**: anti-grav racing on an endless road that morphs from one equation into the next | ![ZERO SET race](docs/screenshots/zsrace.png) **ZERO SET // SINGLE RACE**: three laps against seven rivals; also TIME TRIAL (against your ghost) and ELIMINATION |
+| ![Endless road](docs/screenshots/endless.png) **ENDLESS ROAD**: anti-grav racing on a road that morphs from one equation into the next | ![Anti-grav race](docs/screenshots/antigrav.png) **ANTI-GRAV RACE**: three laps on an equation against seven rivals |
 
 Also in the box: THE GRID, NEON CITY, ORBIT, RAVE WAREHOUSE, GIT GALAXY, HIGHWAY, DEEP SEA,
 PROCESS HIVE, 3D PIPES, 3D MAZE and THE STREET.
@@ -240,7 +240,7 @@ about your taste.
 | GIT GALAXY | any `git` command (your repo's last 150 commits; new ones ignite) |
 | ICE WALL | an error (it cracks open when the next command works) |
 | GIBSON CORE, THE GARBAGE FILE, GROUND ZERO | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
-| RAVE WAREHOUSE, HACK THE PLANET, GIBSON TOWERS, MEGACITY 2049, DEATHMATCH, ZERO SET (continuum, race, elimination) | a typing streak (or type `hack the planet`) |
+| RAVE WAREHOUSE, HACK THE PLANET, GIBSON TOWERS, MEGACITY 2049, DEATHMATCH, ENDLESS ROAD, ANTI-GRAV RACE | a typing streak (or type `hack the planet`) |
 | MILKDROP (tunnel, kaleidoscope, starburst) | a new track starts in the jukebox |
 | 3D PIPES, DNA HELIX | a long build (the screensaver while you wait) |
 | KEYGEN | the build finishes |
@@ -248,7 +248,7 @@ about your taste.
 | NETWATCH, TRAFFIC MAP | a kind of connection you haven't made this session |
 | PROCESS HIVE | a program hogging the CPU |
 | NEWSWIRE, WORLD NEWS | a fresh headline on your feeds |
-| LIGHT CYCLES, LUNATIC FRINGE, ZERO SET // TIME TRIAL | NYX feeling playful |
+| LIGHT CYCLES, LUNATIC FRINGE | NYX feeling playful |
 | NOCTURNE, DEATHMATCH | NYX feeling taunting |
 | STRANGE ATTRACTOR | NYX feeling impressed |
 | HIGHWAY, NEON CITY, DEEP SPACE, THE GRID | NYX's other moods |
