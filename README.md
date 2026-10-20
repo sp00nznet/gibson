@@ -80,7 +80,7 @@ is anyone's real machine.
 | ![Mystify](docs/screenshots/mystify.png) **MYSTIFY**: two polygons and their echoes, bouncing | ![Lunatic Fringe](docs/screenshots/fringe.png) **LUNATIC FRINGE**: a vector shooter that plays itself |
 | ![Strange attractor](docs/screenshots/attractor.png) **STRANGE ATTRACTOR**: Lorenz, Aizawa, Thomas, Halvorsen, as glowing filaments | ![DNA helix](docs/screenshots/helix.png) **DNA HELIX**: base pairs, and the Gibson's genome in hex |
 | ![3D Flowerbox](docs/screenshots/flowerbox.png) **3D FLOWERBOX**: cube to sphere to flower, with echoes | ![Nocturne](docs/screenshots/nocturne.png) **NOCTURNE**: eyes in the dark, watching your terminal |
-| ![Game of Life](docs/screenshots/life.png) **GAME OF LIFE**: Conway on a plane, the old cells rising | |
+| ![Game of Life](docs/screenshots/life.png) **GAME OF LIFE**: Conway on a plane, the old cells rising | ![Deathmatch](docs/screenshots/deathmatch.png) **DEATHMATCH**: a wireframe arena shooter that plays itself behind you |
 
 Also in the box: THE GRID, NEON CITY, ORBIT, RAVE WAREHOUSE, GIT GALAXY, HIGHWAY, DEEP SEA,
 PROCESS HIVE, 3D PIPES, 3D MAZE and THE STREET.
@@ -239,7 +239,7 @@ about your taste.
 | GIT GALAXY | any `git` command (your repo's last 150 commits; new ones ignite) |
 | ICE WALL | an error (it cracks open when the next command works) |
 | GIBSON CORE, THE GARBAGE FILE, GROUND ZERO | `ssh`, `sudo`, `rm -rf` and friends, or NYX feeling intense |
-| RAVE WAREHOUSE, HACK THE PLANET, GIBSON TOWERS, MEGACITY 2049 | a typing streak (or type `hack the planet`) |
+| RAVE WAREHOUSE, HACK THE PLANET, GIBSON TOWERS, MEGACITY 2049, DEATHMATCH | a typing streak (or type `hack the planet`) |
 | MILKDROP (tunnel, kaleidoscope, starburst) | a new track starts in the jukebox |
 | 3D PIPES, DNA HELIX | a long build (the screensaver while you wait) |
 | KEYGEN | the build finishes |
@@ -248,7 +248,7 @@ about your taste.
 | PROCESS HIVE | a program hogging the CPU |
 | NEWSWIRE, WORLD NEWS | a fresh headline on your feeds |
 | LIGHT CYCLES, LUNATIC FRINGE | NYX feeling playful |
-| NOCTURNE | NYX feeling taunting (she is watching) |
+| NOCTURNE, DEATHMATCH | NYX feeling taunting |
 | STRANGE ATTRACTOR | NYX feeling impressed |
 | HIGHWAY, NEON CITY, DEEP SPACE, THE GRID | NYX's other moods |
 | FLYING TOASTERS | NYX feeling tender, or the menu |
@@ -271,6 +271,18 @@ remembered for you; everything else you edit by hand
 | Windows | `%APPDATA%\gibson\config.json` |
 | macOS | `~/Library/Application Support/gibson/config.json` |
 | Linux | `~/.config/gibson/config.json` |
+
+**Sync settings between machines** through a secret gist on your GitHub (right-click >
+Sync settings to GitHub):
+
+1. **Make a token on GitHub** opens GitHub's new-token page with only the `gist` scope ticked.
+   Generate it and copy it.
+2. **Copy it, then click here to use it** reads the token from the clipboard, checks it with
+   GitHub, then clears the clipboard. The token is kept encrypted by your OS, never in config.json.
+3. **Upload settings** on the machine you like, **Download settings** on the others.
+
+Your LLM API key and IRC password are never uploaded; a download keeps the ones already on that
+machine. **Forget the token** deletes it here; revoke it on GitHub too when you're done.
 
 ```json
 {

@@ -4,6 +4,16 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-19
+
+### Added
+- DEATHMATCH world: a wireframe arena shooter that plays itself behind your terminal. Maps are
+  laid out like q3mapgen/hlmapgen's (rooms, a tree of L-shaped corridors, a loop or two), the
+  bots are black-ice's ICE programs, NYX holds the railgun. Scoreboard, kill feed, minimap and
+  health in the margins; a failed command gets you railed; a new map every four minutes.
+- Sync settings to GitHub: a secret gist, through a gist-only token you make on GitHub. The token
+  is encrypted by the OS; the LLM key and IRC password never leave the machine.
+
 ## [0.13.0] - 2026-10-18
 
 ### Added

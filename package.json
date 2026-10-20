@@ -1,6 +1,6 @@
 {
   "name": "gibson",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "GIBSON: a cracktro terminal. Wireframe worlds, reactive techno, and NYX, the unseen sysop who watches you type.",
   "author": "sp00nznet",
   "license": "MIT",
@@ -8,7 +8,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test/check.mjs && node test/irc-check.mjs && node test/theatre-check.mjs && node bbs/check.js",
+    "test": "node sync.js && node test/check.mjs && node test/irc-check.mjs && node test/theatre-check.mjs && node bbs/check.js",
     "shots": "node scripts/shots.mjs",
     "dist": "electron-builder --publish never",
     "icon": "electron scripts/icon.js"
@@ -41,6 +41,7 @@
       "sysinfo.js",
       "bbs/**",
       "irc.js",
+      "sync.js",
       "preload.js",
       "renderer/**",
       "LICENSE",

@@ -1,6 +1,7 @@
 // GIBSON main process: owns the shell (node-pty), the config file, and every
 // LLM call, so API keys never reach the renderer. Design: docs/architecture.md.
-const { app, BrowserWindow, ipcMain, shell, Menu, dialog, protocol, net, globalShortcut, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, dialog, protocol, net, globalShortcut, screen, safeStorage, clipboard } = require('electron');
+const sync = require('./sync');
 const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
@@ -291,6 +292,48 @@ const TAB_COLOURS = [['None', ''], ['Pink', '#ff2e88'], ['Green', '#39ff9c'], ['
 const shellItems = (act) => profiles.map((p) => ({ label: p.name + (p.name === defaultProfile().name ? '  (default)' : ''), click: act('newtab:' + p.name) }));
 
 // Right-click menu. The page sends its current state; clicks come back as hotkey actions.
+// GitHub settings sync (sync.js). The token is kept encrypted by the OS (safeStorage), never in
+// config.json, so it is never uploaded with the settings.
+const syncFile = () => path.join(app.getPath('userData'), 'github-sync.bin');
+function syncState() { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(syncFile()))); } catch { return null; } }
+function syncSave(s) { if (s) fs.writeFileSync(syncFile(), safeStorage.encryptString(JSON.stringify(s))); else fs.rmSync(syncFile(), { force: true }); }
+const tell = (message, type) => dialog.showMessageBox(win, { type: type || 'info', title: 'GIBSON // GitHub sync', message });
+async function syncDo(what) {
+  try {
+    if (what === 'token') {
+      const token = clipboard.readText().trim();
+      if (!sync.looksLikeToken(token)) return tell('Copy the token GitHub showed you (it starts with ghp_ or github_pat_), then pick this again.', 'warning');
+      if (!safeStorage.isEncryptionAvailable()) return tell('This system has no secure storage to keep the token in, so GIBSON will not save it.', 'warning');
+      const login = await sync.whoami(token);
+      syncSave({ token, login, gist: null });
+      if (clipboard.readText().trim() === token) clipboard.clear(); // don't leave it lying around
+      return tell(`Signed in to GitHub as ${login}. Upload your settings from this machine, or download them on another.`);
+    }
+    const s = syncState(); if (!s) return;
+    if (what === 'forget') { syncSave(null); return tell('Token forgotten. Revoke it on GitHub too if you are done with it: Settings > Developer settings > Tokens.'); }
+    const local = JSON.parse(fs.readFileSync(cfg.file, 'utf8'));
+    if (what === 'up') { s.gist = await sync.push(s.token, s.gist, local); syncSave(s); return tell(`Settings uploaded to a secret gist on ${s.login}'s GitHub. Your API key and IRC password stayed here.`); }
+    const got = await sync.pull(s.token, s.gist);
+    if (!got) return tell('Nothing uploaded yet. Upload from the machine whose settings you want first.', 'warning');
+    s.gist = got.id; syncSave(s);
+    fs.writeFileSync(cfg.file, JSON.stringify(sync.merge(got.cfg, local), null, 2));
+    const r = await dialog.showMessageBox(win, { type: 'question', title: 'GIBSON // GitHub sync', message: 'Settings downloaded. Restart GIBSON to use them?', buttons: ['Restart now', 'Later'] });
+    if (r.response === 0) { app.relaunch(); app.exit(0); }
+  } catch (e) { tell(String(e.message || e), 'error'); }
+}
+function syncMenu() {
+  const s = syncState();
+  return { label: 'Sync settings to GitHub', submenu: [
+    { label: s ? `Signed in as ${s.login}` : 'Not signed in', enabled: false },
+    { label: '1. Make a token on GitHub (gist only)...', click: () => shell.openExternal(sync.TOKEN_URL) },
+    { label: '2. Copy it, then click here to use it', click: () => syncDo('token') },
+    { type: 'separator' },
+    { label: 'Upload settings', enabled: !!s, click: () => syncDo('up') },
+    { label: 'Download settings', enabled: !!s, click: () => syncDo('down') },
+    { label: 'Forget the token', enabled: !!s, click: () => syncDo('forget') },
+  ] };
+}
+
 function contextMenu(st) {
   const act = (a) => () => toMenuWindow('hotkey', a);
   const item = (label, a, key, extra) => ({ label, click: act(a), accelerator: key && 'Ctrl+Shift+' + key, registerAccelerator: false, ...extra });
@@ -365,6 +408,7 @@ function contextMenu(st) {
     { label: 'Ask before pasting several lines', type: 'checkbox', checked: cfg.pasteGuard !== false, click: act('pasteguard') },
     { label: 'Fullscreen', accelerator: 'F11', registerAccelerator: false, click: act('fullscreen') },
     { label: 'Open config.json', click: () => shell.openPath(cfg.file) },
+    syncMenu(),
   ]);
 }
 
