@@ -10,16 +10,16 @@
   const hex = (n) => Array.from({ length: n }, () => pick(HEX)).join('');
 
   let cv, g, W = 0, H = 0, F = 1;
-  let cam = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, cy = 1, sy = 0, cp = 1, sp = 0;
+  let cam = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, cy = 1, sy = 0, cp = 1, sp = 0, cr = 1, sr = 0;
   const batches = new Map();
 
-  function setCam(c) { cam = c; cy = Math.cos(c.yaw); sy = Math.sin(c.yaw); cp = Math.cos(c.pitch); sp = Math.sin(c.pitch); }
+  function setCam(c) { cam = c; cy = Math.cos(c.yaw); sy = Math.sin(c.yaw); cp = Math.cos(c.pitch); sp = Math.sin(c.pitch); cr = Math.cos(c.roll || 0); sr = Math.sin(c.roll || 0); }
   function lookAt(c, tx, ty, tz) { const dx = tx - c.x, dy = ty - c.y, dz = tz - c.z; c.yaw = Math.atan2(dx, dz); c.pitch = Math.atan2(dy, Math.hypot(dx, dz)); return c; }
   function toCam(x, y, z) {
     x -= cam.x; y -= cam.y; z -= cam.z;
     const x1 = x * cy - z * sy, z1 = x * sy + z * cy;
     const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
-    return [x1, y2, z2];
+    return sr ? [x1 * cr - y2 * sr, x1 * sr + y2 * cr, z2] : [x1, y2, z2]; // roll: only ZERO SET leans
   }
   const NEAR = 0.3;
   // A segment in world space. fog: distance where it fades out.
@@ -34,6 +34,17 @@
     line2(W / 2 + p[0] * F / p[2], H / 2 - p[1] * F / p[2], W / 2 + q[0] * F / q[2], H / 2 - q[1] * F / q[2], col, al);
   }
   function line2(x1, y1, x2, y2, col, al) {
+    // Trim to a margin round the screen: a line through the camera can project millions of
+    // pixels long, and Chrome's canvas crawls stroking those.
+    const x0 = -W, x9 = 2 * W, y0 = -H, y9 = 2 * H;
+    if (x1 < x0 || x1 > x9 || y1 < y0 || y1 > y9 || x2 < x0 || x2 > x9 || y2 < y0 || y2 > y9) {
+      const dx = x2 - x1, dy = y2 - y1; let t0 = 0, t1 = 1;
+      for (const [p, q] of [[-dx, x1 - x0], [dx, x9 - x1], [-dy, y1 - y0], [dy, y9 - y1]]) {
+        if (p === 0) { if (q < 0) return; continue; }
+        const r = q / p; if (p < 0) { if (r > t1) return; if (r > t0) t0 = r; } else { if (r < t0) return; if (r < t1) t1 = r; }
+      }
+      [x1, y1, x2, y2] = [x1 + dx * t0, y1 + dy * t0, x1 + dx * t1, y1 + dy * t1];
+    }
     const key = col + ',' + Math.min(1, Math.round(al * 5) / 5 * env.bright).toFixed(2);
     let b = batches.get(key); if (!b) batches.set(key, (b = []));
     b.push(x1, y1, x2, y2);

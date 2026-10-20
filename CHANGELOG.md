@@ -4,6 +4,22 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-19
+
+### Added
+- ZERO SET worlds, after sp00nz's anti-grav racer (written fresh, none of the game's code): every
+  track is an equation (lemniscate, trefoil, Möbius, torus knots, a tennis ball's seam...), the
+  camera banks with the road, and it all drives itself. Four modes, each its own world:
+  CONTINUUM (the endless road, each lap morphing into the next curve, the clock topping up per
+  lap), SINGLE RACE (three laps, seven rivals, results), TIME TRIAL (against your best lap's
+  ghost) and ELIMINATION (last place blown off the track each lap). Your activity is the
+  throttle; a failed command puts you into the rail.
+- Worlds can roll the camera (`setCam({ ..., roll })`).
+
+### Fixed
+- Worlds no longer crawl when a line passes close to the camera: lines are trimmed to just
+  outside the screen before they're stroked, instead of being drawn millions of pixels long.
+
 ## [0.14.0] - 2026-10-19
 
 ### Added
