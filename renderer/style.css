@@ -94,7 +94,8 @@ body.unframed #frame { inset: 0; border: none; box-shadow: none; transform: none
 
 /* `nyx <message>`: the conversation floats over the bottom of the pane */
 .nyxchat {
-  position: absolute; right: 14px; bottom: 12px; max-width: min(560px, 80%); z-index: 5; pointer-events: none;
+  position: absolute; right: 14px; bottom: 12px; max-width: min(640px, 85%); max-height: 75%; z-index: 5; pointer-events: none;
+  display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; white-space: pre-wrap; /* newest at the bottom, oldest clipped */
   padding: 8px 12px; font: 13px 'Cascadia Mono', Consolas, monospace; line-height: 1.45;
   background: rgba(20, 0, 14, 0.88); border: 1px solid rgba(255, 46, 136, 0.6); box-shadow: 0 0 18px rgba(255, 46, 136, 0.3);
   opacity: 0; transform: translateY(8px); transition: opacity 0.4s, transform 0.4s;
@@ -102,6 +103,12 @@ body.unframed #frame { inset: 0; border: none; box-shadow: none; transform: none
 .nyxchat.show { opacity: 1; transform: none; }
 .nyxchat .you { color: #8bffc4; }
 .nyxchat .her { color: #ffd6ec; text-shadow: 0 0 6px #ff2e88; margin-bottom: 4px; }
+.nyxchat .step { color: #36d6ff; opacity: 0.75; font-size: 12px; }
+.asktext {
+  position: fixed; left: 50%; top: 30%; transform: translateX(-50%); width: min(560px, 90vw); z-index: 50; outline: none;
+  font: 15px 'Cascadia Mono', Consolas, monospace; color: #fff; background: #0a0010; padding: 10px 12px;
+  border: 1px solid rgba(255, 46, 136, 0.9); box-shadow: 0 0 24px rgba(255, 46, 136, 0.5);
+}
 body.noscroll #scroller { display: none; }
 body.nologo #banner { display: none; }
 

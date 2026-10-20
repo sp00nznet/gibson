@@ -14,7 +14,9 @@ beat.
 Watching it all is **NYX**, the unseen sysop. She greets you when you dial in, needles you about
 typos, gasps at `rm -rf`, gets bored when you go idle, comments on the news and your playlist,
 and changes the world behind your terminal to suit her mood. Type `nyx <anything>` and she answers.
-Plug in a local or hosted LLM and she improvises; without one she has plenty to say anyway.
+Give her a brain (a Claude key, or your own Ollama server) and she's a proper assistant: she reads
+and searches your files, edits them and runs commands to get the job done, asking before she
+changes anything. Without one she has plenty to say anyway.
 
 And the rest of 1995 is in here too: `dial 555-0199` for a BBS with a door game, `wardial` for
 numbers that answer, `nfo` for a release's art with a chiptune, `scan` for some port-scan
@@ -54,6 +56,7 @@ are produced and smoke-tested by CI, but nobody has lived in them yet.
 | Jukebox: your own music folder, with controls, visuals pumping on its beat | done |
 | Modem dial-in on startup (DTMF, answer tone, handshake screech) | done |
 | NYX via Ollama, Anthropic or any OpenAI-compatible API, or canned lines | done (Ollama tested live) |
+| NYX as an assistant: reads, searches, edits files and runs commands (asks first) | done (Ollama tested live) |
 | Cigarette that burns during builds; Matrix rain flickers | done |
 | Installers for Windows, macOS, Linux (unsigned) | done, built by CI |
 
@@ -167,7 +170,7 @@ Everything below is also on the **right-click menu**.
 
 | Key | Does |
 |---|---|
-| `nyx <message>` | type it (or recall it with Up) in any pane and press Enter: NYX answers; the shell never runs it |
+| `nyx <message>` | type it (or recall it with Up) in any pane and press Enter: NYX answers; the shell never runs it. With a brain she works in that pane's folder: `nyx why does npm test fail?` |
 | `Ctrl+Shift+T` / `Ctrl+Shift+X` | new tab / close tab (or the `+` button, and the `x` on each tab or a middle-click) |
 | `▾` next to `+` | new tab with another shell: PowerShell, PowerShell 7, cmd, WSL, Git Bash, whatever is installed |
 | double-click a tab | rename it (Enter keeps it, Esc backs out, empty goes back to the folder name); also right-click > Rename tab |
@@ -211,7 +214,7 @@ shell.
 | `Ctrl+Shift+D` | hide or show the data packets streaming in from the sides |
 | `Ctrl+Shift+W` | next world (the right-click menu picks any) |
 | `Ctrl+Shift+R` | Matrix rain, now |
-| `Ctrl+Shift+N` | NYX on/off (right-click > NYX speaks 1337, for the elite) |
+| `Ctrl+Shift+N` | NYX on/off (right-click > NYX > Speaks 1337, for the elite) |
 | `Ctrl+Shift+I` | the IRC lobby beside your terminal |
 | `F11` | fullscreen |
 
@@ -258,7 +261,7 @@ about your taste.
 | FLYING TOASTERS | NYX feeling tender, or the menu |
 | DATASTREAM, ORBIT, DEEP SEA, THE STREET, BATTLEZONE | the menu or `Ctrl+Shift+W` |
 
-Want one world and no surprises? Right-click > World > **Start in this world** makes the current
+Want one world and no surprises? Right-click > World (sorted into Cyberspace, Cities, Arcade, Visualizers...) > **Start in this world** makes the current
 one your default, and unticking **NYX picks the world** stops her moving you anywhere.
 
 The TRAFFIC MAP places addresses by which internet registry owns their block (Americas, Europe,
@@ -277,7 +280,7 @@ remembered for you; everything else you edit by hand
 | Linux | `~/.config/gibson/config.json` |
 
 **Sync settings between machines** through a secret gist on your GitHub (right-click >
-Sync settings to GitHub):
+Settings > Sync settings to GitHub):
 
 1. **Make a token on GitHub** opens GitHub's new-token page with only the `gist` scope ticked.
    Generate it and copy it.
@@ -315,18 +318,18 @@ machine. **Forget the token** deletes it here; revoke it on GitHub too when you'
   "music": { "on": true, "source": "synth", "folder": "", "shuffle": true, "mode": "reactive", "bpm": 128, "volume": 0.55 },
   "news":  { "feeds": ["https://hnrss.org/frontpage", "https://www.theregister.com/security/headlines.atom"], "minutes": 15 },
   "nyx":   { "on": true, "voice": false, "chatter": 0.35 },
-  "llm":   { "provider": "ollama", "model": "", "baseUrl": "", "apiKey": "", "shareOutput": false, "minGapSec": 20 }
+  "llm":   { "provider": "anthropic", "model": "", "baseUrl": "", "apiKey": "", "shareOutput": false, "minGapSec": 20 }
 }
 ```
 
 - **Shells.** GIBSON finds the installed ones (Windows: PowerShell, PowerShell 7, Command Prompt,
   Git Bash, and each WSL distro by name, Docker Desktop's skipped; elsewhere: `$SHELL` and
   everything in `/etc/shells`, as login shells on macOS). Pick the default with right-click >
-  Tabs > Default shell (saved as `defaultShell`), or open a tab in any of them from the `▾`
+  Tab > Default shell (saved as `defaultShell`), or open a tab in any of them from the `▾`
   button. `profiles` adds your own (`name`, `shell`, `args`, optional starting `cwd`); one with the
   same name as a found shell replaces it. The old `shell` / `shellArgs` settings still work as the
   default when `defaultShell` is blank.
-- **Start tabs.** Set your tabs up (shell, folder, panes), then right-click > Tabs > **Open these
+- **Start tabs.** Set your tabs up (shell, folder, panes), then right-click > Tab > **Open these
   tabs on start**. Next launch they come back in the same shells, folders and names. Or write
   `startupTabs` by hand. "Forget the start tabs" goes back to one default tab.
 - `world`: the world to start in (blank: NYX decides). `nyxWorlds: false` keeps you there.
@@ -350,8 +353,10 @@ machine. **Forget the token** deletes it here; revoke it on GitHub too when you'
   (nothing is fetched).
 - `nyx.chatter`: 0 to 1, how often she comments on ordinary commands. Errors, dangerous
   commands, builds and long idles always get a line. `nyx.voice` reads her lines aloud.
-- `llm.provider`: `ollama` (default `llama3.2:3b`), `anthropic` (default `claude-opus-5-5`, key
-  from `ANTHROPIC_API_KEY`), `openai` (key from `OPENAI_API_KEY`; set `baseUrl` for LM Studio,
+- `llm.provider` (or right-click > NYX > Brain): `anthropic` (the default, `claude-opus-5-5`; paste
+  a key with right-click > NYX > API key, or set `ANTHROPIC_API_KEY`), `ollama` (default
+  `llama3.2:3b`; right-click > NYX > **Ollama server...** points her at another machine, and
+  **Ollama model** lists what it has), `openai` (key from `OPENAI_API_KEY`; set `baseUrl` for LM Studio,
   vLLM or any OpenAI-compatible server), or `none` for canned lines only.
 - `llm.shareOutput`: also send the last bit of terminal output. Off by default. What NYX sees and
   what leaves your machine is spelled out in [SECURITY.md](SECURITY.md).

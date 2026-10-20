@@ -8,7 +8,8 @@ const fs = require('fs');
 const os = require('os');
 const pty = require('node-pty');
 const { execFile, execFileSync } = require('child_process');
-const { llmLine } = require('./llm');
+const { llmLine, DEFAULT_MODEL, DEFAULT_BASE } = require('./llm');
+const agent = require('./agent');
 const sys = require('./sysinfo');
 const { createIrc, defaultNick } = require('./irc');
 
@@ -69,10 +70,10 @@ const DEFAULTS = {
   music: { on: true, mode: 'reactive', bpm: 128, volume: 0.55, source: 'synth', folder: '', shuffle: true }, // source: synth | folder
   nyx: { on: true, voice: false, chatter: 0.35, leet: false },
   llm: {
-    provider: 'ollama',       // ollama | anthropic | openai | none
+    provider: 'anthropic',    // anthropic (Claude) | ollama | openai | none (canned lines only)
     model: '',                // blank = provider default (llm.js)
     baseUrl: '',              // blank = provider default
-    apiKey: '',               // prefer ANTHROPIC_API_KEY / OPENAI_API_KEY env vars
+    apiKey: '',               // better: right-click > NYX > API key (kept encrypted), or ANTHROPIC_API_KEY / OPENAI_API_KEY
     shareOutput: false,       // send the last bit of terminal output with each event
     minGapSec: 20,
   },
@@ -334,6 +335,86 @@ function syncMenu() {
   ] };
 }
 
+// NYX's brain. API keys live encrypted by the OS (safeStorage) in llm-key.bin, never in config.json.
+const keyFile = () => path.join(app.getPath('userData'), 'llm-key.bin');
+function keys() { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(keyFile()))); } catch { return {}; } }
+function brain() {
+  const c = cfg.llm, p = c.provider;
+  return { ...c, model: c.model || DEFAULT_MODEL[p], base: (c.baseUrl || DEFAULT_BASE[p] || '').replace(/\/$/, ''), apiKey: c.apiKey || keys()[p] };
+}
+// Change llm settings: this session, config.json, and every window's copy (which has no key).
+function llmSet(patch) {
+  cfg.llm = { ...cfg.llm, ...patch };
+  if (!SHOT) { try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u.llm = { ...(u.llm || {}), ...patch }; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* keep it for this session */ } }
+  for (const w of BrowserWindow.getAllWindows()) w.webContents.send('llm', { ...cfg.llm, apiKey: undefined });
+  if (patch.baseUrl !== undefined || patch.provider === 'ollama') refreshOllama();
+}
+let ollamaModels = [];
+function refreshOllama() {
+  const base = (cfg.llm.provider === 'ollama' && cfg.llm.baseUrl) || DEFAULT_BASE.ollama;
+  fetch(base.replace(/\/$/, '') + '/api/tags', { signal: AbortSignal.timeout(3000) }).then((r) => r.json())
+    .then((j) => { ollamaModels = (j.models || []).map((m) => m.name).sort(); }).catch(() => { ollamaModels = []; });
+}
+async function keyFromClipboard() {
+  const k = clipboard.readText().trim(), p = /^sk-ant-/.test(k) ? 'anthropic' : /^sk-/.test(k) ? 'openai' : null;
+  const say = (message, type) => dialog.showMessageBox(win, { type: type || 'info', title: 'GIBSON // NYX', message });
+  if (!p) return say('Copy your API key first (a Claude key starts with sk-ant-, an OpenAI one with sk-), then pick this again.', 'warning');
+  if (!safeStorage.isEncryptionAvailable()) return say('This system has no secure storage to keep the key in, so GIBSON will not save it.', 'warning');
+  fs.writeFileSync(keyFile(), safeStorage.encryptString(JSON.stringify({ ...keys(), [p]: k })));
+  if (clipboard.readText().trim() === k) clipboard.clear();
+  llmSet({ provider: p });
+  say(`${p === 'anthropic' ? 'Claude' : 'OpenAI'} key saved (encrypted) and NYX switched over to it.`);
+}
+
+// World menu sections. A world not listed here lands under Other.
+const WORLD_GROUPS = [
+  ['Cyberspace', ['grid', 'tunnel', 'core', 'ice', 'git', 'files', 'garbage', 'bbs', 'hack']],
+  ['Cities', ['city', 'skyline', 'cyberpunk', 'ruins', 'street', 'towers', 'highway']],
+  ['Out there', ['planet', 'battle', 'sea']],
+  ['Arcade', ['battlezone', 'cycles', 'deathmatch', 'endless', 'antigrav', 'tube', 'trench', 'trader', 'rocks', 'lander', 'stunt']],
+  ['Visualizers', ['rave', 'milkdrop', 'kaleido', 'starburst', 'attractor', 'helix', 'life']],
+  ['Screensavers', ['toasters', 'mystify', 'pipes', 'maze', 'flowerbox', 'fringe', 'nocturne', 'keygen']],
+  ['Your machine', ['net', 'hive', 'news', 'newsglobe', 'traffic']],
+];
+function worldMenu(st, act) {
+  const radio = ([key, label]) => ({ label: key === cfg.world ? label + '  (start)' : label, type: 'radio', checked: key === st.world, click: act('world:' + key) });
+  const known = new Set(WORLD_GROUPS.flatMap((g) => g[1])), have = new Map(st.worlds);
+  const groups = [...WORLD_GROUPS, ['Other', st.worlds.map((w) => w[0]).filter((k) => !known.has(k))]]
+    .map(([name, ks]) => [name, ks.filter((k) => have.has(k)).map((k) => [k, have.get(k)])]).filter((g) => g[1].length);
+  return [
+    ...groups.map(([name, ws]) => ({ label: ws.some((w) => w[0] === st.world) ? `${name}  •` : name, submenu: ws.map(radio) })),
+    { type: 'separator' },
+    { label: 'Start in this world', type: 'checkbox', checked: cfg.world === st.world, click: () => { writeCfg('world', cfg.world === st.world ? '' : st.world); } },
+    { label: 'NYX picks the world', type: 'checkbox', checked: cfg.nyxWorlds !== false, click: act('nyxworlds') },
+  ];
+}
+
+function nyxMenu(st, act, item) {
+  const c = cfg.llm, k = keys(), radio = (p, label) => ({ label, type: 'radio', checked: c.provider === p, click: () => llmSet({ provider: p }) });
+  refreshOllama(); // for next time: the menu can't wait on the network
+  const keyNote = (p, env) => (k[p] ? 'key saved' : process.env[env] ? `key from ${env}` : 'no key yet');
+  return [
+    item('On', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
+    { label: 'Speaks 1337', type: 'checkbox', checked: st.leet, click: act('leet') },
+    { type: 'separator' },
+    { label: 'Brain', enabled: false },
+    radio('anthropic', `Claude  (${keyNote('anthropic', 'ANTHROPIC_API_KEY')})`),
+    radio('ollama', `Ollama at ${(c.provider === 'ollama' && c.baseUrl) || DEFAULT_BASE.ollama}`),
+    radio('openai', `OpenAI  (${keyNote('openai', 'OPENAI_API_KEY')})`),
+    radio('none', 'None: canned lines only'),
+    { type: 'separator' },
+    { label: 'API key: copy it, then click here', click: keyFromClipboard },
+    { label: 'Get a Claude key...', click: () => shell.openExternal('https://console.anthropic.com/settings/keys') },
+    { label: 'Ollama server...', click: act('ask:ollama') },
+    { label: 'Ollama model', enabled: c.provider === 'ollama', submenu: [
+      { label: `Default (${DEFAULT_MODEL.ollama})`, type: 'radio', checked: !c.model, click: () => llmSet({ model: '' }) },
+      ...(ollamaModels.length ? ollamaModels.map((m) => ({ label: m, type: 'radio', checked: c.model === m, click: () => llmSet({ model: m }) }))
+        : [{ label: 'No models found at that server (yet)', enabled: false }]),
+    ] },
+    { label: 'Share terminal output with her', type: 'checkbox', checked: !!c.shareOutput, click: () => llmSet({ shareOutput: !c.shareOutput }) },
+  ];
+}
+
 function contextMenu(st) {
   const act = (a) => () => toMenuWindow('hotkey', a);
   const item = (label, a, key, extra) => ({ label, click: act(a), accelerator: key && 'Ctrl+Shift+' + key, registerAccelerator: false, ...extra });
@@ -344,12 +425,12 @@ function contextMenu(st) {
     item('New tab', 'newtab', 'T'),
     { label: 'New tab with', submenu: shellItems(act) },
     item('Close tab', 'closetab', 'X'),
-    { label: 'Rename tab...', click: act('renametab') },
-    { label: 'Tab colour', submenu: TAB_COLOURS.map(([label, c]) => ({ label, type: 'radio', checked: c === (st.tabColor || ''), click: act('tabcolor:' + c) })) },
-    { label: 'Tabs', submenu: [
+    { label: 'Tab', submenu: [
+      { label: 'Rename...', click: act('renametab') },
+      { label: 'Colour', submenu: TAB_COLOURS.map(([label, c]) => ({ label, type: 'radio', checked: c === (st.tabColor || ''), click: act('tabcolor:' + c) })) },
+      { type: 'separator' },
       { label: 'Open these tabs on start', click: act('tabs:save') },
       { label: `Forget the start tabs${cfg.startupTabs.length ? ` (${cfg.startupTabs.length})` : ''}`, enabled: cfg.startupTabs.length > 0, click: () => writeCfg('startupTabs', []) },
-      { type: 'separator' },
       { label: 'Default shell', submenu: profiles.map((p) => ({ label: p.name, type: 'radio', checked: p.name === defaultProfile().name, click: () => writeCfg('defaultShell', p.name) })) },
     ] },
     { label: 'Panes', submenu: [
@@ -359,20 +440,12 @@ function contextMenu(st) {
       item('Type into every pane', 'broadcast', 'A', { type: 'checkbox', checked: st.broadcast, enabled: st.panes > 1 }),
       { label: 'Even out the panes', click: act('evenpanes'), enabled: st.panes > 1 },
     ] },
-    { label: 'Text size', submenu: [
-      { label: 'Bigger', accelerator: 'Ctrl+=', registerAccelerator: false, click: act('font:up') },
-      { label: 'Smaller', accelerator: 'Ctrl+-', registerAccelerator: false, click: act('font:down') },
-      { label: `Reset (${DEFAULTS.fontSize})`, accelerator: 'Ctrl+0', registerAccelerator: false, click: act('font:reset') },
-    ] },
-    { label: 'World', submenu: [
-      ...st.worlds.map(([key, label]) => ({ label: key === cfg.world ? label + '  (start)' : label, type: 'radio', checked: key === st.world, click: act('world:' + key) })),
-      { type: 'separator' },
-      { label: 'Start in this world', type: 'checkbox', checked: cfg.world === st.world, click: () => { writeCfg('world', cfg.world === st.world ? '' : st.world); } },
-      { label: 'NYX picks the world', type: 'checkbox', checked: cfg.nyxWorlds !== false, click: act('nyxworlds') },
-    ] },
     { type: 'separator' },
+    { label: 'World', submenu: worldMenu(st, act) },
+    { label: 'NYX', submenu: nyxMenu(st, act, item) },
     { label: 'Music', submenu: [
       item('On', 'music', 'M', { type: 'checkbox', checked: st.music }),
+      item('Tempo follows activity', 'tempo', 'B', { type: 'checkbox', checked: st.reactive }),
       { type: 'separator' },
       { label: 'Synth (follows your activity)', type: 'radio', checked: st.source === 'synth', click: act('music:synth') },
       { label: st.folder ? `Folder: ${path.basename(st.folder)}` : 'Folder (none chosen)', type: 'radio', checked: st.source === 'folder', click: act('music:folder') },
@@ -385,13 +458,6 @@ function contextMenu(st) {
       { label: 'Volume up', accelerator: 'Ctrl+Shift+=', registerAccelerator: false, click: act('music:volup') },
       { label: 'Volume down', accelerator: 'Ctrl+Shift+-', registerAccelerator: false, click: act('music:voldown') },
     ] },
-    item('Tempo follows activity', 'tempo', 'B', { type: 'checkbox', checked: st.reactive }),
-    item('Framed', 'frame', 'U', { type: 'checkbox', checked: st.framed }),
-    item('Scroller', 'scroller', 'S', { type: 'checkbox', checked: st.scroller }),
-    item('Logo', 'logo', 'L', { type: 'checkbox', checked: st.logo }),
-    item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
-    { label: 'Cigarette while compiling', type: 'checkbox', checked: cfg.cigarette !== false, click: act('cigarette') },
-    item('NYX', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
     { label: 'IRC lobby', submenu: [
       item('Show', 'irc', 'I', { type: 'checkbox', checked: st.irc }),
       { type: 'separator' },
@@ -399,16 +465,31 @@ function contextMenu(st) {
         ({ label, type: 'radio', checked: cfg.irc.mode === m, click: () => setIrcMode(m) })),
       { label: 'Server, nick, channels... (config.json, then pick Real again)', click: () => shell.openPath(cfg.file) },
     ] },
-    { label: 'NYX speaks 1337', type: 'checkbox', checked: st.leet, click: act('leet') },
-    item('Matrix rain', 'rain', 'R'),
+    { label: 'Look', submenu: [
+      item('Framed', 'frame', 'U', { type: 'checkbox', checked: st.framed }),
+      item('Scroller', 'scroller', 'S', { type: 'checkbox', checked: st.scroller }),
+      item('Logo', 'logo', 'L', { type: 'checkbox', checked: st.logo }),
+      item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
+      { label: 'Cigarette while compiling', type: 'checkbox', checked: cfg.cigarette !== false, click: act('cigarette') },
+      item('Matrix rain', 'rain', 'R'),
+      { type: 'separator' },
+      { label: 'Pane opacity', submenu: [
+        ...[1, 0.86, 0.7, 0.5, 0.3, 0.15, 0].map((o) => ({ label: `${Math.round(o * 100)}%`, type: 'radio', checked: Math.abs(o - st.opacity) < 0.01, click: act('opacity:' + o) })),
+        { type: 'separator' }, item('Cycle', 'opacity', 'O'),
+      ] },
+      { label: 'Text size', submenu: [
+        { label: 'Bigger', accelerator: 'Ctrl+=', registerAccelerator: false, click: act('font:up') },
+        { label: 'Smaller', accelerator: 'Ctrl+-', registerAccelerator: false, click: act('font:down') },
+        { label: `Reset (${DEFAULTS.fontSize})`, accelerator: 'Ctrl+0', registerAccelerator: false, click: act('font:reset') },
+      ] },
+      { label: 'Fullscreen', accelerator: 'F11', registerAccelerator: false, click: act('fullscreen') },
+    ] },
     { type: 'separator' },
-    { label: 'Pane opacity', submenu: [1, 0.86, 0.7, 0.5, 0.3, 0.15, 0].map((o) => ({ label: `${Math.round(o * 100)}%`, type: 'radio', checked: Math.abs(o - st.opacity) < 0.01, click: act('opacity:' + o) })) },
-    item('Cycle opacity', 'opacity', 'O'),
-    { type: 'separator' },
-    { label: 'Ask before pasting several lines', type: 'checkbox', checked: cfg.pasteGuard !== false, click: act('pasteguard') },
-    { label: 'Fullscreen', accelerator: 'F11', registerAccelerator: false, click: act('fullscreen') },
-    { label: 'Open config.json', click: () => shell.openPath(cfg.file) },
-    syncMenu(),
+    { label: 'Settings', submenu: [
+      { label: 'Ask before pasting several lines', type: 'checkbox', checked: cfg.pasteGuard !== false, click: act('pasteguard') },
+      { label: 'Open config.json', click: () => shell.openPath(cfg.file) },
+      syncMenu(),
+    ] },
   ]);
 }
 
@@ -587,7 +668,28 @@ app.whenReady().then(() => {
     });
   });
   ipcMain.on('menu', (e, st) => { menuWc = e.sender; contextMenu(st).popup({ window: winOf(e) }); });
-  ipcMain.handle('nyx:llm', (_e, event) => llmLine(cfg.llm, event).catch(() => null));
+  ipcMain.handle('nyx:llm', (_e, event) => llmLine(brain(), event).catch(() => null));
+  // `nyx <message>`: the tool loop (agent.js), or the plain one-liner if the brain can't do tools.
+  ipcMain.handle('nyx:agent', async (e, ev) => {
+    const c = brain(), w = winOf(e), cwd = (panes.get(ev.pane) || { cwd: home }).cwd;
+    if (c.provider === 'none' || SHOT) return llmLine(c, { ...ev, kind: 'chat' }).catch(() => null);
+    let trust = false;
+    const confirm = async (kind, message, detail) => {
+      if (trust) return true;
+      const r = await dialog.showMessageBox(w, { type: 'question', title: 'GIBSON // NYX wants to ' + kind, message, detail, buttons: ['Allow', 'Allow everything this time', 'No'], defaultId: 0, cancelId: 2, noLink: true });
+      if (r.response === 1) trust = true;
+      return r.response < 2;
+    };
+    const step = (text) => { if (!e.sender.isDestroyed()) e.sender.send('nyx:step', ev.pane, text); };
+    try { return await agent.ask(c, { ...ev, cwd }, { step, confirm }); }
+    catch (err) { console.error('nyx agent:', err.message); return llmLine(c, { ...ev, kind: 'chat' }).catch(() => null); }
+  });
+  ipcMain.on('llm:set', (_e, patch) => { // from the page: only these, and only strings/booleans
+    const ok = {}; for (const k of ['provider', 'baseUrl', 'model']) if (typeof (patch || {})[k] === 'string') ok[k] = patch[k];
+    if (ok.provider && !['anthropic', 'ollama', 'openai', 'none'].includes(ok.provider)) delete ok.provider;
+    if (ok.baseUrl && !/^https?:\/\/\S+$/.test(ok.baseUrl)) return;
+    llmSet(ok);
+  });
   ipcMain.on('win:focus', (e) => { const w = winOf(e); if (w.isMinimized()) w.restore(); w.show(); w.focus(); });
   ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); w.setFullScreen(!w.isFullScreen()); });
   // NEWSWIRE: fetch the feeds now and every news.minutes, push headlines to the page.

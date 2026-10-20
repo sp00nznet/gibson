@@ -111,4 +111,4 @@ async function llmLine(c, ev) {
   return null;
 }
 
-module.exports = { llmLine, parse, describe, MOODS };
+module.exports = { llmLine, parse, describe, MOODS, DEFAULT_MODEL, DEFAULT_BASE };

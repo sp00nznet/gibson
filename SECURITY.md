@@ -6,11 +6,18 @@ machine, and where keys live:
 - **What NYX sends.** Each event sends the kind of event, the hour, your typing speed, your
   username, the current directory and the command you typed. The last ~600 characters of
   terminal *output* are sent only when `llm.shareOutput` is `true` (default `false`). The
-  default provider is a local Ollama, so by default nothing leaves the machine.
+  default brain is Claude, which does nothing until you give it a key, so by default nothing
+  leaves the machine. With Ollama, nothing leaves it either.
+- **`nyx <message>` can look around and act.** With a brain, NYX reads, lists and searches files
+  on her own (starting in the pane's folder), and what she reads goes to the model. Editing or
+  writing a file and running a command always ask first; "Allow everything this time" lasts
+  until that one answer is done.
 - **Commands can contain secrets.** A command like `curl -H "Authorization: ..."` is sent as
   typed when a hosted provider (Anthropic, OpenAI) is configured. Use `ollama` or `none` if
   that matters to you.
-- **API keys.** Prefer the `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` environment variables. A key
+- **API keys.** Right-click > NYX > **API key** keeps it encrypted by the OS (Electron
+  `safeStorage`, in `llm-key.bin` beside `config.json`), never in `config.json`, so settings sync
+  never uploads it. The `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` environment variables work too. A key
   put in `config.json` (see the README for its path on each system) is stored in plain text. Keys stay in
   the main process; the page never receives them (`main.js` strips `apiKey` before handing
   the config over).

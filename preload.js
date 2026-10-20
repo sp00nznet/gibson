@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld('gibson', {
   musicPick: () => ipcRenderer.invoke('music:pick'),
   save: (key, v) => ipcRenderer.send('cfg:save', key, v),
   llm: (ev) => ipcRenderer.invoke('nyx:llm', ev),
+  agent: (ev) => ipcRenderer.invoke('nyx:agent', ev),
+  onStep: (fn) => ipcRenderer.on('nyx:step', (_e, pane, text) => fn(pane, text)),
+  setLlm: (patch) => ipcRenderer.send('llm:set', patch),
+  onLlm: (fn) => ipcRenderer.on('llm', (_e, c) => fn(c)),
   fullscreen: () => ipcRenderer.send('win:fullscreen'),
   focusWindow: () => ipcRenderer.send('win:focus'),
 });

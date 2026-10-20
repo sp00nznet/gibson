@@ -91,6 +91,15 @@
     t.el.classList.toggle('zoomed', !!t.zoom);
   }
   // Rename in place: Enter keeps it, Escape backs out, an empty name goes back to the folder.
+  // A one-line text box over the page (Electron has no prompt()). Enter keeps, Escape drops.
+  function askText(placeholder, value, done) {
+    const inp = document.createElement('input');
+    inp.className = 'asktext'; inp.placeholder = placeholder; inp.value = value; document.body.appendChild(inp); inp.focus(); inp.select();
+    const close = () => { inp.remove(); if (focused) focused.term.focus(); };
+    inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { const v = inp.value.trim(); close(); if (v) done(v); } else if (e.key === 'Escape') close(); };
+    inp.onblur = close;
+  }
+  window.gibson.onLlm((c) => Object.assign(cfg.llm, c));
   function renameTab(t) {
     const lbl = t.btn.firstChild, inp = document.createElement('input');
     inp.className = 'rename'; inp.value = t.opts.name || ''; inp.placeholder = t.cwdName || 'name';
@@ -328,20 +337,24 @@
 
   // Talking to NYX. The exchange shows in an overlay on the pane, not in the terminal
   // text: anything written into xterm behind ConPTY's back is painted over by its next redraw.
+  // With a brain she works the problem (agent.js): each tool she uses shows as a step line.
+  const chatLine = (p, cls, text, before) => {
+    const d = document.createElement('div'); d.className = cls; d.textContent = text; p.chat.insertBefore(d, before || null);
+    while (p.chat.children.length > 16) p.chat.firstChild.remove();
+    return d;
+  };
+  window.gibson.onStep((id, text) => { const p = allPanes().find((x) => x.id === id); if (p && p.reply) chatLine(p, 'step', '  ~ ' + text, p.reply); });
   async function nyxChat(p, message) {
-    const add = (cls, text) => {
-      const d = document.createElement('div'); d.className = cls; d.textContent = text; p.chat.appendChild(d);
-      while (p.chat.children.length > 8) p.chat.firstChild.remove();
-      return d;
-    };
-    add('you', '> ' + (message || 'nyx'));
+    chatLine(p, 'you', '> ' + (message || 'nyx'));
     if (/hack\s+the\s+planet/i.test(message) && !B.world) Worlds.go('hack');
-    const reply = add('her', 'NYX> ...');
+    const reply = p.reply = chatLine(p, 'her', 'NYX> ...');
     p.chat.classList.add('show'); clearTimeout(p.chatHide);
+    nyxPane = p;
     const line = await nyx.chat(message);
-    reply.textContent = 'NYX> ' + line.text;
-    p.chatHide = setTimeout(() => p.chat.classList.remove('show'), 30000);
+    reply.textContent = 'NYX> ' + line.text; p.reply = null;
+    p.chatHide = setTimeout(() => p.chat.classList.remove('show'), Math.min(120000, 30000 + line.text.length * 60));
   }
+  let nyxPane = null; // the pane whose `nyx` question is in flight: her tools work in its folder
 
   const adoptTab = (a) => { const t = makeTab(a.opts, a.ids); t.c = a.c; t.r = a.r; layout(t); switchTab(t); };
   window.gibson.onAdopt(adoptTab); // a tab dropped here from another window
@@ -370,7 +383,7 @@
   const leet = (s) => s.replace(/[aeiostlgb]/gi, (c) => (Math.random() < 0.65 ? LEET[c.toLowerCase()] : c));
   const nyx = new Nyx(cfg, {
     info: () => ({ user: B.user, host: B.host, hour: new Date().getHours(), activity: act.level().toFixed(2), cwd: (worldEnv.fs && worldEnv.fs.cwd) || B.cwd }),
-    llm: (ev) => window.gibson.llm(ev),
+    llm: (ev) => (ev.kind === 'chat' ? window.gibson.agent({ ...ev, pane: (nyxPane || focused).id }) : window.gibson.llm(ev)),
     say(said, mood, world) {
       const text = cfg.nyx.leet ? leet(said) : said;
       const el = $('nyxtext'); el.textContent = ''; let i = 0;
@@ -505,6 +518,11 @@
     else if (a === 'tabs:save') { window.gibson.saveTabs(tabs.map((x) => ({ id: x.panes[0].id, panes: x.panes.length, name: x.opts.name, color: x.opts.color }))); nyx.ctx.say(`${tabs.length} tab${tabs.length > 1 ? 's' : ''} saved. They will be waiting next time.`, 'tender'); }
     else if (a === 'packets') { cfg.packets = cfg.packets === false; window.gibson.save('packets', cfg.packets); }
     else if (a === 'tempo') { cfg.music.mode = cfg.music.mode === 'reactive' ? 'fixed' : 'reactive'; nyx.ctx.say(`Tempo ${cfg.music.mode === 'fixed' ? 'locked at ' + cfg.music.bpm : 'follows your hands'}.`, 'playful'); }
+    else if (a === 'ask:ollama') return askText('Ollama server, e.g. http://192.168.1.20:11434', cfg.llm.baseUrl || 'http://127.0.0.1:11434', (v) => {
+      const url = /^https?:\/\//.test(v) ? v : 'http://' + v;
+      window.gibson.setLlm({ provider: 'ollama', baseUrl: url.replace(/\/$/, ''), model: '' });
+      nyx.ctx.say(`Plugged into ${url}. Pick a model under right-click > NYX if you like.`, 'curious');
+    });
     else if (a === 'nyx') { cfg.nyx.on = !cfg.nyx.on; $('nyx').style.opacity = cfg.nyx.on ? 1 : 0.3; }
     else if (a === 'world') { const n = Worlds.names; Worlds.go(n[(n.indexOf(Worlds.current()) + 1) % n.length]); }
     else if (a.startsWith('world:')) Worlds.go(a.slice(6));

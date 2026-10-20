@@ -4,6 +4,23 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-20
+
+### Added
+- NYX is an assistant now, after xrip/tinycode: `nyx <message>` runs a small tool loop that reads,
+  lists, finds and greps files in the pane's folder, edits and writes files and runs commands.
+  Each step shows on the pane; edits, writes and commands ask first. Works with Claude, Ollama
+  (models with tool support) and OpenAI-compatible servers; without one she falls back to a line.
+- Right-click > NYX: pick her brain (Claude, Ollama, OpenAI, none), paste an API key (kept
+  encrypted, never in config.json), point her at an Ollama server and pick one of its models.
+
+### Changed
+- The right-click menu is shorter: tab things under Tab, the look under Look, NYX under NYX,
+  config and sync under Settings.
+- The World menu is sorted into Cyberspace, Cities, Out there, Arcade, Visualizers, Screensavers
+  and Your machine.
+- The default brain is Claude (`llm.provider: "anthropic"`) for new configs; existing ones keep theirs.
+
 ## [0.16.0] - 2026-10-19
 
 ### Added
