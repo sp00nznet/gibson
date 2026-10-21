@@ -1,6 +1,7 @@
 // NYX's optional brain. One short line per terminal event, from a local or
 // hosted model. Every failure returns null and the renderer falls back to its
 // canned lines (renderer/nyx.js), so GIBSON never waits on a model.
+const local = require('./local');
 const MOODS = ['welcoming', 'curious', 'playful', 'taunting', 'impressed', 'bored', 'intense', 'tender'];
 
 const SYSTEM = `You are NYX, the unseen sysop living inside a hacker's terminal called GIBSON.
@@ -8,7 +9,7 @@ Late-90s BBS energy: Hackers (1995), System Shock's SHODAN but on their side, KM
 You watch every command. You taunt, tease and needle, but you are rooting for them and you say so.
 Call them "hacker", "operator", "netrunner" or "insect" (fondly). Never explain shell commands like a tutor.
 Reply with ONE line under 120 characters, prefixed by a mood tag in square brackets, one of:
-${MOODS.join(', ')}. Example: [taunting] Another typo. My grandmother phreaks faster than you, and she is a toaster.
+${MOODS.join(', ')}. Format: [mood] your line. Always write a fresh line about what just happened; never reuse an example.
 When the hacker talks to you directly, answer what they actually said, in character, in one or two sentences
 under 240 characters, still starting with the mood tag.`;
 
@@ -69,7 +70,8 @@ async function post(url, headers, body) {
 async function llmLine(c, ev) {
   if (!c || c.provider === 'none') return null;
   const model = c.model || DEFAULT_MODEL[c.provider];
-  const base = (c.baseUrl || DEFAULT_BASE[c.provider] || '').replace(/\/$/, '');
+  if (c.provider === 'local') c = { ...c, model: c.model || local.DEFAULT };
+  const base = (c.base || c.baseUrl || DEFAULT_BASE[c.provider] || '').replace(/\/$/, '');
   const user = describe(c.shareOutput ? ev : { ...ev, output: undefined, history: undefined });
   const chat = ev.kind === 'chat';
   // A chat carries the conversation so far; it must open with a user turn.
@@ -78,6 +80,11 @@ async function llmLine(c, ev) {
   const messages = [...turns, { role: 'user', content: user }];
   const max = chat ? 280 : 160;
 
+  if (c.provider === 'local') {
+    if (!local.have(local.byId(c.model))) return null;
+    const history = turns.map((t) => ({ role: t.role, content: t.content }));
+    return parse(await local.chat({ id: c.model, system: SYSTEM, history, message: user, maxTokens: chat ? 160 : 80 }), max);
+  }
   if (c.provider === 'ollama') {
     const j = await post(`${base}/api/chat`, {}, {
       model, stream: false, options: { temperature: 0.9, num_predict: chat ? 160 : 80 },

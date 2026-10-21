@@ -1,6 +1,6 @@
 {
   "name": "gibson",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "GIBSON: a cracktro terminal. Wireframe worlds, reactive techno, and NYX, the unseen sysop who watches you type.",
   "author": "sp00nznet",
   "license": "MIT",
@@ -21,6 +21,7 @@
     "@xterm/addon-webgl": "0.19.0",
     "@xterm/xterm": "6.0.0",
     "chiptune3": "0.8.9",
+    "node-llama-cpp": "^3.22.2",
     "node-pty": "1.1.0"
   },
   "devDependencies": {
@@ -43,6 +44,8 @@
       "irc.js",
       "sync.js",
       "agent.js",
+      "local.js",
+      "!node_modules/@node-llama-cpp/*-cuda{,-ext}/**",
       "preload.js",
       "renderer/**",
       "LICENSE",
@@ -50,6 +53,8 @@
     ],
     "asarUnpack": [
       "node_modules/node-pty/**",
+      "node_modules/node-llama-cpp/**",
+      "node_modules/@node-llama-cpp/**",
       "bbs/**"
     ],
     "npmRebuild": false,

@@ -14,7 +14,8 @@ beat.
 Watching it all is **NYX**, the unseen sysop. She greets you when you dial in, needles you about
 typos, gasps at `rm -rf`, gets bored when you go idle, comments on the news and your playlist,
 and changes the world behind your terminal to suit her mood. Type `nyx <anything>` and she answers.
-Give her a brain (a Claude key, or your own Ollama server) and she's a proper assistant: she reads
+Give her a brain (a small model GIBSON downloads and runs itself, a Claude key, or your own Ollama
+or llama.cpp server) and she's a proper assistant: she reads
 and searches your files, edits them and runs commands to get the job done, asking before she
 changes anything. Without one she has plenty to say anyway.
 
@@ -57,6 +58,7 @@ are produced and smoke-tested by CI, but nobody has lived in them yet.
 | Modem dial-in on startup (DTMF, answer tone, handshake screech) | done |
 | NYX via Ollama, Anthropic or any OpenAI-compatible API, or canned lines | done (Ollama tested live) |
 | NYX as an assistant: reads, searches, edits files and runs commands (asks first) | done (Ollama tested live) |
+| A built-in brain: Qwen3 models run inside GIBSON (node-llama-cpp), downloaded on request | done (0.6B and 1.7B tested live) |
 | Cigarette that burns during builds; Matrix rain flickers | done |
 | Installers for Windows, macOS, Linux (unsigned) | done, built by CI |
 
@@ -318,7 +320,7 @@ machine. **Forget the token** deletes it here; revoke it on GitHub too when you'
   "music": { "on": true, "source": "synth", "folder": "", "shuffle": true, "mode": "reactive", "bpm": 128, "volume": 0.55 },
   "news":  { "feeds": ["https://hnrss.org/frontpage", "https://www.theregister.com/security/headlines.atom"], "minutes": 15 },
   "nyx":   { "on": true, "voice": false, "chatter": 0.35 },
-  "llm":   { "provider": "anthropic", "model": "", "baseUrl": "", "apiKey": "", "shareOutput": false, "minGapSec": 20 }
+  "llm":   { "provider": "local", "models": {}, "urls": {}, "apiKey": "", "shareOutput": false, "minGapSec": 20 }
 }
 ```
 
@@ -353,11 +355,15 @@ machine. **Forget the token** deletes it here; revoke it on GitHub too when you'
   (nothing is fetched).
 - `nyx.chatter`: 0 to 1, how often she comments on ordinary commands. Errors, dangerous
   commands, builds and long idles always get a line. `nyx.voice` reads her lines aloud.
-- `llm.provider` (or right-click > NYX > Brain): `anthropic` (the default, `claude-opus-5-5`; paste
-  a key with right-click > NYX > API key, or set `ANTHROPIC_API_KEY`), `ollama` (default
-  `llama3.2:3b`; right-click > NYX > **Ollama server...** points her at another machine, and
-  **Ollama model** lists what it has), `openai` (key from `OPENAI_API_KEY`; set `baseUrl` for LM Studio,
-  vLLM or any OpenAI-compatible server), or `none` for canned lines only.
+- `llm.provider` (or right-click > NYX > Brain): `local` (the default: a model GIBSON runs itself.
+  Right-click > NYX > **Built-in model** lists them with their size and asks before downloading:
+  Qwen3 0.6B 0.4 GB, Qwen3 1.7B 1.1 GB (recommended), Qwen3 4B 2.5 GB, Qwen2.5-Coder 7B 4.7 GB.
+  They live in a `models` folder beside `config.json`; the same menu deletes them. A GPU is used
+  through Vulkan when there is one), `anthropic` (`claude-opus-5-5`; paste a key with right-click >
+  NYX > API key, or set `ANTHROPIC_API_KEY`), `ollama` (default `llama3.2:3b`; right-click > NYX >
+  Ollama > **Server address...** points her at another machine and lists its models), `openai` (key from `OPENAI_API_KEY`; set `baseUrl` for LM Studio,
+  vLLM or any OpenAI-compatible server, or right-click > NYX > llama.cpp / LM Studio / OpenAI >
+  **Server address...**; start llama.cpp's `llama-server` with `--jinja` so she can use tools), or `none` for canned lines only.
 - `llm.shareOutput`: also send the last bit of terminal output. Off by default. What NYX sees and
   what leaves your machine is spelled out in [SECURITY.md](SECURITY.md).
 

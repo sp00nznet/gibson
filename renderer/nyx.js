@@ -43,7 +43,7 @@
     compile: [['intense', 'Light one up. This is going to take a while.'], ['bored', 'Compiling. Of course. I will just watch the smoke.'], ['tender', 'Let it build. You earned a break.']],
     done: [['impressed', 'It finished. Did it work, though?'], ['playful', 'Stub it out. Back to work.']],
     chat: [ // no model configured, or it failed: she still answers, briefly
-      ['playful', 'I hear you. Give me a brain (right-click > NYX: a Claude key or your Ollama) and I will actually help.'],
+      ['playful', 'I hear you. Give me a brain (right-click > NYX > Built-in model, a Claude key or your Ollama) and I will actually help.'],
       ['taunting', 'Talk is cheap, insect. Type something that compiles.'],
       ['tender', 'I am listening. I am always listening.'], ['bored', 'Mm-hm. Fascinating. Back to work.'],
       ['curious', 'Ask me again when the build passes.'], ['playful', 'You talk to your terminal now? Good. So do I.'],

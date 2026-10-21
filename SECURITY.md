@@ -6,8 +6,11 @@ machine, and where keys live:
 - **What NYX sends.** Each event sends the kind of event, the hour, your typing speed, your
   username, the current directory and the command you typed. The last ~600 characters of
   terminal *output* are sent only when `llm.shareOutput` is `true` (default `false`). The
-  default brain is Claude, which does nothing until you give it a key, so by default nothing
-  leaves the machine. With Ollama, nothing leaves it either.
+  default brain is the built-in model, which runs on this machine (and does nothing until you
+  download one), so by default nothing leaves the machine. With Ollama, nothing leaves it either.
+- **Built-in models** are downloaded only when you pick one, from Hugging Face over HTTPS, after
+  a dialog naming the file and its size. They are plain GGUF weights run by node-llama-cpp's
+  prebuilt llama.cpp binaries; GIBSON never compiles anything on your machine.
 - **`nyx <message>` can look around and act.** With a brain, NYX reads, lists and searches files
   on her own (starting in the pane's folder), and what she reads goes to the model. Editing or
   writing a file and running a command always ask first; "Allow everything this time" lasts

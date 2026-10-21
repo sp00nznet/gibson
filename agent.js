@@ -4,6 +4,7 @@
 // the one-line chat in llm.js.
 const fs = require('fs'), path = require('path'), { exec } = require('child_process');
 const { MOODS } = require('./llm');
+const local = require('./local');
 
 const SYSTEM = (cwd) => `You are NYX, the sysop living inside a hacker's terminal called GIBSON: late-90s BBS energy,
 Hackers (1995), teasing but on their side. You are also a sharp, capable assistant. You have tools to read,
@@ -146,6 +147,7 @@ async function ask(c, { message, history, cwd }, hooks, maxTurns = 16) {
   const msgs = (Array.isArray(history) ? history : []).map((h) => ({ role: h.who === 'nyx' ? 'assistant' : 'user', content: String(h.text) }));
   while (msgs.length && msgs[0].role !== 'user') msgs.shift();
   msgs.push({ role: 'user', content: String(message) });
+  if (c.provider === 'local') return askLocal(c, msgs, cwd, hooks, maxTurns);
   const turn = c.provider === 'anthropic' ? BACKENDS.anthropic : BACKENDS.chat, sys = SYSTEM(cwd);
   for (let i = 0; i < maxTurns; i++) {
     const r = await turn(c, sys, msgs);
@@ -159,6 +161,28 @@ async function ask(c, { message, history, cwd }, hooks, maxTurns = 16) {
     BACKENDS.results(c, msgs, done);
   }
   return { text: 'I went around in circles on that one. Ask me again, smaller.', mood: 'bored' };
+}
+
+// The built-in model: node-llama-cpp runs the tool loop itself, with the calls held to the schema by a grammar.
+// Grammar schemas have no optional fields, so the local tools take only the ones they need.
+async function askLocal(c, msgs, cwd, hooks, maxTurns) {
+  let calls = 0;
+  const functions = Object.fromEntries(TOOLS.map((t) => {
+    const keep = Object.keys(t.properties).filter((k) => t.required.includes(k) || k === 'path');
+    return [t.name, {
+      description: t.description + (keep.includes('path') ? ' path: use . for the current folder.' : ''),
+      params: { type: 'object', properties: Object.fromEntries(keep.map((k) => [k, { type: t.properties[k].type }])) },
+      async handler(a) {
+        if (++calls > maxTurns) return 'That is enough tools. Answer now with what you have.';
+        let out, step;
+        try { [out, step] = await runTool(t.name, a || {}, cwd, hooks.confirm); } catch (e) { out = `error: ${e.message}`; step = `${t.name} failed`; }
+        hooks.step(step); return out;
+      },
+    }];
+  }));
+  const message = msgs.pop().content;
+  const text = await local.chat({ id: c.model, system: SYSTEM(cwd), history: msgs, message, functions, maxTokens: 1200, think: 512 });
+  return finish(text);
 }
 
 module.exports = { ask, runTool, finish, TOOLS };

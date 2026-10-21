@@ -4,6 +4,21 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-21
+
+### Added
+- A built-in brain for NYX: right-click > NYX > Built-in model downloads a small model (Qwen3
+  0.6B, 1.7B or 4B, or Qwen2.5-Coder 7B) after a dialog with its size and memory needs, and runs
+  it inside GIBSON with node-llama-cpp. Nothing leaves the machine; a GPU is used through Vulkan.
+  Progress shows on the taskbar; the same menu cancels a download or deletes the models.
+- Right-click > NYX > llama.cpp / LM Studio / OpenAI > Server address: any OpenAI-compatible
+  server, with its models listed. Ollama gets the same submenu.
+
+### Changed
+- Each brain keeps its own server and model (`llm.urls`, `llm.models`), so switching between
+  them no longer carries an Ollama model name over to another server.
+- The default brain for new configs is the built-in one.
+
 ## [0.17.0] - 2026-10-20
 
 ### Added

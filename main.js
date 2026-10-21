@@ -10,6 +10,7 @@ const pty = require('node-pty');
 const { execFile, execFileSync } = require('child_process');
 const { llmLine, DEFAULT_MODEL, DEFAULT_BASE } = require('./llm');
 const agent = require('./agent');
+const local = require('./local');
 const sys = require('./sysinfo');
 const { createIrc, defaultNick } = require('./irc');
 
@@ -70,9 +71,9 @@ const DEFAULTS = {
   music: { on: true, mode: 'reactive', bpm: 128, volume: 0.55, source: 'synth', folder: '', shuffle: true }, // source: synth | folder
   nyx: { on: true, voice: false, chatter: 0.35, leet: false },
   llm: {
-    provider: 'anthropic',    // anthropic (Claude) | ollama | openai | none (canned lines only)
-    model: '',                // blank = provider default (llm.js)
-    baseUrl: '',              // blank = provider default
+    provider: 'local',        // local (built-in, right-click > NYX > Built-in model) | anthropic (Claude) | ollama | openai (any OpenAI-compatible server) | none
+    models: {},               // per brain, e.g. { "local": "qwen3-1.7b", "ollama": "qwen2.5-coder:7b" }; blank = its default
+    urls: {},                 // per brain, e.g. { "ollama": "http://192.168.1.20:11434", "openai": "http://127.0.0.1:8080" }
     apiKey: '',               // better: right-click > NYX > API key (kept encrypted), or ANTHROPIC_API_KEY / OPENAI_API_KEY
     shareOutput: false,       // send the last bit of terminal output with each event
     minGapSec: 20,
@@ -338,22 +339,72 @@ function syncMenu() {
 // NYX's brain. API keys live encrypted by the OS (safeStorage) in llm-key.bin, never in config.json.
 const keyFile = () => path.join(app.getPath('userData'), 'llm-key.bin');
 function keys() { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(keyFile()))); } catch { return {}; } }
+// Each brain keeps its own server and model (llm.urls / llm.models); the older single
+// llm.model / llm.baseUrl still apply to whichever brain is picked when those are blank.
 function brain() {
-  const c = cfg.llm, p = c.provider;
-  return { ...c, model: c.model || DEFAULT_MODEL[p], base: (c.baseUrl || DEFAULT_BASE[p] || '').replace(/\/$/, ''), apiKey: c.apiKey || keys()[p] };
+  const c = cfg.llm, p = c.provider, u = (c.urls || {})[p], m = (c.models || {})[p];
+  const base = (u || c.baseUrl || DEFAULT_BASE[p] || '').replace(/\/$/, '');
+  let model = p === 'local' ? m || local.DEFAULT : m || c.model || (p === 'openai' && base !== DEFAULT_BASE.openai && serverModels.openai[0]) || DEFAULT_MODEL[p];
+  return { ...c, model, base, apiKey: c.apiKey || keys()[p] };
 }
 // Change llm settings: this session, config.json, and every window's copy (which has no key).
 function llmSet(patch) {
   cfg.llm = { ...cfg.llm, ...patch };
   if (!SHOT) { try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u.llm = { ...(u.llm || {}), ...patch }; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* keep it for this session */ } }
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send('llm', { ...cfg.llm, apiKey: undefined });
-  if (patch.baseUrl !== undefined || patch.provider === 'ollama') refreshOllama();
+  refreshModels();
 }
-let ollamaModels = [];
-function refreshOllama() {
-  const base = (cfg.llm.provider === 'ollama' && cfg.llm.baseUrl) || DEFAULT_BASE.ollama;
-  fetch(base.replace(/\/$/, '') + '/api/tags', { signal: AbortSignal.timeout(3000) }).then((r) => r.json())
-    .then((j) => { ollamaModels = (j.models || []).map((m) => m.name).sort(); }).catch(() => { ollamaModels = []; });
+// Point a brain at a server and/or model, and switch to it. Clears the old shared fields.
+const useBrain = (p, { url, model } = {}) => llmSet({
+  provider: p, model: '', baseUrl: '',
+  ...(url !== undefined ? { urls: { ...(cfg.llm.urls || {}), [p]: url } } : {}),
+  ...(model !== undefined ? { models: { ...(cfg.llm.models || {}), [p]: model } } : {}),
+});
+// What the Ollama and OpenAI-compatible servers have, for the menu (which can't wait on the network).
+const serverModels = { ollama: [], openai: [] };
+function refreshModels() {
+  for (const p of ['ollama', 'openai']) {
+    const base = ((cfg.llm.urls || {})[p] || (cfg.llm.provider === p && cfg.llm.baseUrl) || DEFAULT_BASE[p]).replace(/\/$/, '');
+    if (p === 'openai' && base === DEFAULT_BASE.openai) { serverModels.openai = []; continue; } // OpenAI's own list is hundreds long
+    fetch(base + (p === 'ollama' ? '/api/tags' : '/v1/models'), { signal: AbortSignal.timeout(3000) }).then((r) => r.json())
+      .then((j) => { serverModels[p] = (p === 'ollama' ? (j.models || []).map((x) => x.name) : (j.data || []).map((x) => x.id)).sort(); })
+      .catch(() => { serverModels[p] = []; });
+  }
+}
+
+// The built-in brain's models: downloaded on request, with the size and RAM spelled out first.
+let dlPct = -1;
+async function getModel(m) {
+  if (local.have(m)) return useBrain('local', { model: m.id });
+  if (local.downloading()) return tell(`Already downloading ${local.downloading().name}. One at a time.`, 'warning');
+  const r = await dialog.showMessageBox(win, {
+    type: 'question', title: 'GIBSON // download a brain for NYX', noLink: true, buttons: [`Download ${m.gb} GB`, 'Cancel'], defaultId: 0, cancelId: 1,
+    message: `Download ${m.name} (${m.gb} GB)?`,
+    detail: `It comes from Hugging Face (${m.repo}) and is saved in\n${local.dirOf()}\n\nIt runs on this machine: nothing you ask her leaves it. It wants about ${m.ram} GB of free memory, and a GPU makes it much faster. ${m.note[0].toUpperCase() + m.note.slice(1)}.\n\nRight-click > NYX > Built-in model can delete it again.`,
+  });
+  if (r.response !== 0) return;
+  const all = () => BrowserWindow.getAllWindows();
+  const say = (text, mood) => { for (const w of all()) w.webContents.send('nyx:say', text, mood); };
+  say(`Downloading ${m.name}. ${m.gb} GB of brain, coming right up.`, 'curious');
+  dlPct = 0;
+  try {
+    await local.download(m, (f) => {
+      const pct = Math.floor(f * 100); if (pct === dlPct) return; dlPct = pct;
+      for (const w of all()) w.setProgressBar(f);
+      if (pct % 25 === 0 && pct > 0 && pct < 100) say(`${m.name}: ${pct}%`, 'intense');
+    });
+    useBrain('local', { model: m.id });
+    say(`${m.name} is in. Ask me something: nyx <message>.`, 'impressed');
+  } catch (e) {
+    if (!/abort|cancel/i.test(String(e.message))) tell(`The download failed: ${e.message}`, 'error'); else say('Download cancelled.', 'bored');
+  } finally { dlPct = -1; for (const w of all()) w.setProgressBar(-1); }
+}
+async function deleteModels() {
+  const r = await dialog.showMessageBox(win, { type: 'warning', title: 'GIBSON // NYX', noLink: true, buttons: ['Delete', 'Cancel'], defaultId: 1, cancelId: 1,
+    message: `Delete the downloaded models (${local.diskGb().toFixed(1)} GB)?`, detail: local.dirOf() });
+  if (r.response !== 0) return;
+  fs.rmSync(local.dirOf(), { recursive: true, force: true });
+  tell('Models deleted. Restart GIBSON if NYX had one loaded, to free its memory too.');
 }
 async function keyFromClipboard() {
   const k = clipboard.readText().trim(), p = /^sk-ant-/.test(k) ? 'anthropic' : /^sk-/.test(k) ? 'openai' : null;
@@ -362,7 +413,7 @@ async function keyFromClipboard() {
   if (!safeStorage.isEncryptionAvailable()) return say('This system has no secure storage to keep the key in, so GIBSON will not save it.', 'warning');
   fs.writeFileSync(keyFile(), safeStorage.encryptString(JSON.stringify({ ...keys(), [p]: k })));
   if (clipboard.readText().trim() === k) clipboard.clear();
-  llmSet({ provider: p });
+  useBrain(p);
   say(`${p === 'anthropic' ? 'Claude' : 'OpenAI'} key saved (encrypted) and NYX switched over to it.`);
 }
 
@@ -390,27 +441,47 @@ function worldMenu(st, act) {
 }
 
 function nyxMenu(st, act, item) {
-  const c = cfg.llm, k = keys(), radio = (p, label) => ({ label, type: 'radio', checked: c.provider === p, click: () => llmSet({ provider: p }) });
-  refreshOllama(); // for next time: the menu can't wait on the network
+  const c = cfg.llm, k = keys(), on = c.provider;
+  const radio = (p, label) => ({ label, type: 'radio', checked: on === p, click: () => (p === 'local' && !local.have(local.byId(localPick)) ? getModel(local.byId(localPick)) : useBrain(p)) });
   const keyNote = (p, env) => (k[p] ? 'key saved' : process.env[env] ? `key from ${env}` : 'no key yet');
+  const urlOf = (p) => ((c.urls || {})[p] || (on === p && c.baseUrl) || DEFAULT_BASE[p]).replace(/^https?:\/\//, '');
+  const modelOf = (p) => (c.models || {})[p] || (on === p && c.model) || '';
+  const localPick = (c.models || {}).local || local.DEFAULT, dl = local.downloading();
+  const serverList = (p, def) => [
+    { label: `Default (${def})`, type: 'radio', checked: !modelOf(p), click: () => useBrain(p, { model: '' }) },
+    ...(serverModels[p].length ? serverModels[p].map((m) => ({ label: m, type: 'radio', checked: modelOf(p) === m, click: () => useBrain(p, { model: m }) }))
+      : [{ label: 'No models found at that server (yet)', enabled: false }]),
+  ];
+  refreshModels(); // for next time
   return [
     item('On', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
     { label: 'Speaks 1337', type: 'checkbox', checked: st.leet, click: act('leet') },
     { type: 'separator' },
     { label: 'Brain', enabled: false },
+    radio('local', `Built-in: ${local.byId(localPick).name}${local.have(local.byId(localPick)) ? '' : '  (not downloaded)'}`),
     radio('anthropic', `Claude  (${keyNote('anthropic', 'ANTHROPIC_API_KEY')})`),
-    radio('ollama', `Ollama at ${(c.provider === 'ollama' && c.baseUrl) || DEFAULT_BASE.ollama}`),
-    radio('openai', `OpenAI  (${keyNote('openai', 'OPENAI_API_KEY')})`),
+    radio('ollama', `Ollama at ${urlOf('ollama')}`),
+    radio('openai', `OpenAI-compatible at ${urlOf('openai')}`),
     radio('none', 'None: canned lines only'),
     { type: 'separator' },
+    { label: 'Built-in model', submenu: [
+      ...local.MODELS.map((m) => ({
+        label: `${m.name}   ${m.gb} GB, ${m.note}${local.have(m) ? '' : '   (download)'}`, type: 'radio',
+        checked: on === 'local' && localPick === m.id, enabled: !dl, click: () => getModel(m),
+      })),
+      { type: 'separator' },
+      ...(dl ? [{ label: `Cancel the ${dl.name} download (${Math.max(0, dlPct)}%)`, click: () => local.cancel() }] : []),
+      { label: `Delete downloaded models (${local.diskGb().toFixed(1)} GB)`, enabled: !dl && local.diskGb() > 0, click: deleteModels },
+    ] },
+    { label: 'Ollama', submenu: [{ label: 'Server address...', click: act('ask:ollama') }, { type: 'separator' }, ...serverList('ollama', DEFAULT_MODEL.ollama)] },
+    { label: 'llama.cpp / LM Studio / OpenAI', submenu: [
+      { label: 'Server address...', click: act('ask:openai') },
+      { label: 'Back to OpenAI itself', click: () => useBrain('openai', { url: '', model: '' }) },
+      { type: 'separator' }, ...serverList('openai', urlOf('openai') === 'api.openai.com' ? DEFAULT_MODEL.openai : 'the first it has'),
+    ] },
     { label: 'API key: copy it, then click here', click: keyFromClipboard },
     { label: 'Get a Claude key...', click: () => shell.openExternal('https://console.anthropic.com/settings/keys') },
-    { label: 'Ollama server...', click: act('ask:ollama') },
-    { label: 'Ollama model', enabled: c.provider === 'ollama', submenu: [
-      { label: `Default (${DEFAULT_MODEL.ollama})`, type: 'radio', checked: !c.model, click: () => llmSet({ model: '' }) },
-      ...(ollamaModels.length ? ollamaModels.map((m) => ({ label: m, type: 'radio', checked: c.model === m, click: () => llmSet({ model: m }) }))
-        : [{ label: 'No models found at that server (yet)', enabled: false }]),
-    ] },
+    { type: 'separator' },
     { label: 'Share terminal output with her', type: 'checkbox', checked: !!c.shareOutput, click: () => llmSet({ shareOutput: !c.shareOutput }) },
   ];
 }
@@ -573,6 +644,7 @@ function hotkeys(win) {
 protocol.registerSchemesAsPrivileged([{ scheme: 'gibson-music', privileges: { standard: true, secure: true, stream: true, corsEnabled: true, supportFetchAPI: true } }]); // fetch: tracker modules are read whole
 
 app.whenReady().then(() => {
+  local.init(path.join(app.getPath('userData'), 'models'));
   cfg = loadConfig();
   if (MUSIC) cfg.music = { ...cfg.music, source: 'folder', folder: path.resolve(MUSIC) };
   profiles = detectShells();
@@ -673,6 +745,7 @@ app.whenReady().then(() => {
   ipcMain.handle('nyx:agent', async (e, ev) => {
     const c = brain(), w = winOf(e), cwd = (panes.get(ev.pane) || { cwd: home }).cwd;
     if (c.provider === 'none' || SHOT) return llmLine(c, { ...ev, kind: 'chat' }).catch(() => null);
+    if (c.provider === 'local' && !local.have(local.byId(c.model))) return { text: `No brain in my skull yet. Right-click > NYX > Built-in model downloads one (${local.byId(c.model).name}, ${local.byId(c.model).gb} GB).`, mood: 'playful' };
     let trust = false;
     const confirm = async (kind, message, detail) => {
       if (trust) return true;
@@ -684,11 +757,9 @@ app.whenReady().then(() => {
     try { return await agent.ask(c, { ...ev, cwd }, { step, confirm }); }
     catch (err) { console.error('nyx agent:', err.message); return llmLine(c, { ...ev, kind: 'chat' }).catch(() => null); }
   });
-  ipcMain.on('llm:set', (_e, patch) => { // from the page: only these, and only strings/booleans
-    const ok = {}; for (const k of ['provider', 'baseUrl', 'model']) if (typeof (patch || {})[k] === 'string') ok[k] = patch[k];
-    if (ok.provider && !['anthropic', 'ollama', 'openai', 'none'].includes(ok.provider)) delete ok.provider;
-    if (ok.baseUrl && !/^https?:\/\/\S+$/.test(ok.baseUrl)) return;
-    llmSet(ok);
+  ipcMain.on('llm:server', (_e, p, url) => { // from the page's address box: a server for Ollama or an OpenAI-compatible brain
+    if (!['ollama', 'openai'].includes(p) || !/^https?:\/\/[^\s/]+(\/\S*)?$/.test(String(url))) return;
+    useBrain(p, { url: String(url).replace(/\/$/, ''), model: '' });
   });
   ipcMain.on('win:focus', (e) => { const w = winOf(e); if (w.isMinimized()) w.restore(); w.show(); w.focus(); });
   ipcMain.on('win:fullscreen', (e) => { const w = winOf(e); w.setFullScreen(!w.isFullScreen()); });

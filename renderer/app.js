@@ -100,6 +100,7 @@
     inp.onblur = close;
   }
   window.gibson.onLlm((c) => Object.assign(cfg.llm, c));
+  window.gibson.onSay((text, mood) => nyx.ctx.say(text, mood));
   function renameTab(t) {
     const lbl = t.btn.firstChild, inp = document.createElement('input');
     inp.className = 'rename'; inp.value = t.opts.name || ''; inp.placeholder = t.cwdName || 'name';
@@ -518,11 +519,15 @@
     else if (a === 'tabs:save') { window.gibson.saveTabs(tabs.map((x) => ({ id: x.panes[0].id, panes: x.panes.length, name: x.opts.name, color: x.opts.color }))); nyx.ctx.say(`${tabs.length} tab${tabs.length > 1 ? 's' : ''} saved. They will be waiting next time.`, 'tender'); }
     else if (a === 'packets') { cfg.packets = cfg.packets === false; window.gibson.save('packets', cfg.packets); }
     else if (a === 'tempo') { cfg.music.mode = cfg.music.mode === 'reactive' ? 'fixed' : 'reactive'; nyx.ctx.say(`Tempo ${cfg.music.mode === 'fixed' ? 'locked at ' + cfg.music.bpm : 'follows your hands'}.`, 'playful'); }
-    else if (a === 'ask:ollama') return askText('Ollama server, e.g. http://192.168.1.20:11434', cfg.llm.baseUrl || 'http://127.0.0.1:11434', (v) => {
-      const url = /^https?:\/\//.test(v) ? v : 'http://' + v;
-      window.gibson.setLlm({ provider: 'ollama', baseUrl: url.replace(/\/$/, ''), model: '' });
-      nyx.ctx.say(`Plugged into ${url}. Pick a model under right-click > NYX if you like.`, 'curious');
-    });
+    else if (a === 'ask:ollama' || a === 'ask:openai') {
+      const p = a.slice(4), was = (cfg.llm.urls || {})[p];
+      return askText(p === 'ollama' ? 'Ollama server, e.g. http://192.168.1.20:11434' : 'llama.cpp / LM Studio / vLLM server, e.g. http://127.0.0.1:8080',
+        was || (p === 'ollama' ? 'http://127.0.0.1:11434' : 'http://127.0.0.1:8080'), (v) => {
+          const url = /^https?:\/\//.test(v) ? v : 'http://' + v;
+          window.gibson.setServer(p, url);
+          nyx.ctx.say(`Plugged into ${url}. Its models are under right-click > NYX.`, 'curious');
+        });
+    }
     else if (a === 'nyx') { cfg.nyx.on = !cfg.nyx.on; $('nyx').style.opacity = cfg.nyx.on ? 1 : 0.3; }
     else if (a === 'world') { const n = Worlds.names; Worlds.go(n[(n.indexOf(Worlds.current()) + 1) % n.length]); }
     else if (a.startsWith('world:')) Worlds.go(a.slice(6));
