@@ -39,7 +39,7 @@ It is mostly for fun. But some of it is genuinely handy:
 
 ## Status
 
-**0.10.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
+**0.19.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
 are produced and smoke-tested by CI, but nobody has lived in them yet.
 
 | | |
@@ -47,13 +47,17 @@ are produced and smoke-tested by CI, but nobody has lived in them yet.
 | Real shell (node-pty), xterm.js 6 with WebGL, links, Unicode 11 | done |
 | Tabs, each with 1 to 4 tiled panes; per-pane opacity; framed or full-window; hideable logo and scroller | done |
 | Talk to NYX from any pane: `nyx <message>` | done |
-| Twenty-eight wireframe worlds, five of them live system data or your RSS feeds | done |
+| 96 wireframe worlds in eleven menu sections, some drawn from your live system, your RSS feeds or tonight's real sky | done |
+| Every world dances to the music: the kick, the bass and the highs | done |
 | Find, text size, pane resize/zoom, broadcast input, file links, finished-command alerts, paste guard, quake key | done |
 | `dial` a BBS (with a door game), `wardial`, `nfo`, `scan`, the cookie monster, the red alert | done |
 | IRC lobby beside the terminal: a simulated #hackers, or a real server | done (real mode tested against a local server) |
 | Tracker modules (.mod .xm .s3m .it) in the jukebox; a Winamp-style player | done |
 | Shell profiles (PowerShell, PowerShell 7, cmd, WSL, Git Bash, your own); start tabs that reopen in their folders | done |
-| Reactive synth soundtrack, 84 to 162 BPM, following your activity | done |
+| Reactive synth soundtrack, 84 to 162 BPM, following your activity, in seven song styles | done |
+| Synth panel: filter, drive and echo on the synth or your own music; style, layers, key | done |
+| System monitor: CPU, memory, disks, network, top processes | done |
+| Extras: Hollywood hacking, CRT mode, blue screen on errors, classic windows, BIOS boot, key clicks, chimes | done |
 | Jukebox: your own music folder, with controls, visuals pumping on its beat | done |
 | Modem dial-in on startup (DTMF, answer tone, handshake screech) | done |
 | NYX via Ollama, Anthropic or any OpenAI-compatible API, or canned lines | done (Ollama tested live) |
@@ -69,53 +73,27 @@ is anyone's real machine.
 
 | | |
 |---|---|
-| ![Your folder as a wireframe city](docs/screenshots/files.png) **FILESYSTEM**: the folder you `cd` into, as towers | ![The Gibson mainframe](docs/screenshots/core.png) **GIBSON CORE**: where `ssh`, `sudo` and `rm -rf` take you |
-| ![Live connections as satellites](docs/screenshots/net.png) **NETWATCH**: your live TCP connections | ![Headlines on LED tickers](docs/screenshots/news.png) **NEWSWIRE**: your RSS feeds, crawling |
-| ![A 90s BBS](docs/screenshots/bbs.png) **BBS LOBBY**: the board you dial into at boot | ![Black ICE](docs/screenshots/ice.png) **ICE WALL**: red on an error, cracks open on success |
-| ![Light cycles](docs/screenshots/cycles.png) **LIGHT CYCLES**: six riders, one arena | ![Battlezone](docs/screenshots/battlezone.png) **BATTLEZONE**: vector tanks and a radar sweep |
-| ![Four panes, four opacities](docs/screenshots/tiled.png) **Four panes**, each at its own opacity | ![Full window](docs/screenshots/unframed.png) **Full window**: no frame, the planet behind your panes |
-| ![Space battle](docs/screenshots/battle.png) **DEEP SPACE**: fleets trading lasers | ![Data tunnel](docs/screenshots/tunnel.png) **DATASTREAM**: down the wire |
-| ![Flying toasters](docs/screenshots/toasters.png) **FLYING TOASTERS**: and toast, some of it burnt | ![Hack the planet](docs/screenshots/hack.png) **HACK THE PLANET**: the Earth, a Jolly Roger floppy, the words going round |
-| ![World news on a globe](docs/screenshots/newsglobe.png) **WORLD NEWS**: headlines pop up where they happened | ![Your traffic on a globe](docs/screenshots/traffic.png) **TRAFFIC MAP**: your connections arcing out from home |
-| ![A keygen](docs/screenshots/keygen.png) **KEYGEN**: serials, greetz, copper bars; when a build finishes | ![The garbage file](docs/screenshots/garbage.png) **THE GARBAGE FILE**: hunted through the Gibson's tree |
-| ![Dialing a BBS](docs/screenshots/dial.png) **`dial 555-0199`**: a BBS in a tab, with a door game | ![The IRC lobby](docs/screenshots/irc.png) **IRC lobby**: #hackers beside your shell (`Ctrl+Shift+I`) |
-| ![Gibson towers](docs/screenshots/towers.png) **GIBSON TOWERS**: flying the glass canyons | ![Milkdrop tunnel](docs/screenshots/milkdrop.png) **MILKDROP**: tunnel, kaleidoscope and starburst presets that follow your music |
-| ![Megacity 2049](docs/screenshots/cyberpunk.png) **MEGACITY 2049**: a spinner through neon, rain and holograms | ![Ground zero](docs/screenshots/ruins.png) **GROUND ZERO**: the city after the bombs, a Geiger counter ticking |
-| ![Manhattan 1995](docs/screenshots/skyline.png) **MANHATTAN 1995**: the skyline from a Brooklyn rooftop | ![Kaleidoscope](docs/screenshots/kaleido.png) **MILKDROP // KALEIDOSCOPE** |
-| ![Mystify](docs/screenshots/mystify.png) **MYSTIFY**: two polygons and their echoes, bouncing | ![Lunatic Fringe](docs/screenshots/fringe.png) **LUNATIC FRINGE**: a vector shooter that plays itself |
-| ![Strange attractor](docs/screenshots/attractor.png) **STRANGE ATTRACTOR**: Lorenz, Aizawa, Thomas, Halvorsen, as glowing filaments | ![DNA helix](docs/screenshots/helix.png) **DNA HELIX**: base pairs, and the Gibson's genome in hex |
-| ![3D Flowerbox](docs/screenshots/flowerbox.png) **3D FLOWERBOX**: cube to sphere to flower, with echoes | ![Nocturne](docs/screenshots/nocturne.png) **NOCTURNE**: eyes in the dark, watching your terminal |
-| ![Game of Life](docs/screenshots/life.png) **GAME OF LIFE**: Conway on a plane, the old cells rising | ![Deathmatch](docs/screenshots/deathmatch.png) **DEATHMATCH**: a wireframe arena shooter that plays itself behind you |
-| ![Endless road](docs/screenshots/endless.png) **ENDLESS ROAD**: anti-grav racing on a road that morphs from one equation into the next | ![Anti-grav race](docs/screenshots/antigrav.png) **ANTI-GRAV RACE**: three laps on an equation against seven rivals |
-| ![Vector tube](docs/screenshots/tube.png) **VECTOR TUBE**: a claw on the rim of a tube, flippers climbing up it | ![Trench run](docs/screenshots/trench.png) **TRENCH RUN**: down the trench, turrets firing, then the exhaust port |
-| ![Free trader](docs/screenshots/trader.png) **FREE TRADER**: pirates, docking, hyperspace, trading between systems | ![Rock field](docs/screenshots/rocks.png) **ROCK FIELD**: asteroids in 3D, splitting as they're shot |
-| ![Lunar lander](docs/screenshots/lander.png) **LUNAR LANDER**: an autopilot that usually lands | ![Stunt track](docs/screenshots/stunt.png) **STUNT TRACK**: a raised track with jumps, a rival and a crane |
-| ![Outatime](docs/screenshots/outatime.png) **OUTATIME**: a DeLorean builds to 88 mph as you type, folds its wheels and flies off, leaving fire trails | ![Starfighter](docs/screenshots/starfighter.png) **STARFIGHTER**: the Gunstar holds the Frontier against Ko-Dan waves; every 20 kills, the Death Blossom |
-| ![Wopr](docs/screenshots/wopr.png) **WOPR**: the war room runs every scenario, faster and faster, until it learns | ![Spinner](docs/screenshots/spinner.png) **SPINNER**: a police flyer in the rain between arcologies and burning refinery stacks |
-| ![Navigator](docs/screenshots/navigator.png) **NAVIGATOR**: a chrome teardrop ship skimming the sea and hills | ![Explorers](docs/screenshots/explorers.png) **EXPLORERS**: a homemade bubble ship from a backyard to the stars |
-| ![Blipvert](docs/screenshots/headroom.png) **BLIPVERT**: a stuttering TV host in a spinning room of grids | ![Arrakis](docs/screenshots/arrakis.png) **ARRAKIS**: dunes, an ornithopter, wormsign, then the worm |
-| ![Motion Tracker](docs/screenshots/tracker.png) **MOTION TRACKER**: a corridor, a pinging tracker, sentry guns counting down | ![The Real](docs/screenshots/real.png) **THE REAL**: a battered hovercraft through ruined tunnels and the scorched surface, sentinels and the EMP |
-| ![Neo-Tokyo](docs/screenshots/akira.png) **NEO-TOKYO**: a red bike and its tail-light trail down a ruined highway | ![Thermoptic](docs/screenshots/thermoptic.png) **THERMOPTIC**: the rooftop dive, cloaking as she falls |
-| ![Cyberbrain](docs/screenshots/cyberbrain.png) **CYBERBRAIN**: a ghost-hack dive through barriers to a brain of nodes | ![Spider Tank](docs/screenshots/spidertank.png) **SPIDER TANK**: a museum hall, a tree of life, columns going to pieces |
-| ![Missile Circus](docs/screenshots/macross.png) **MISSILE CIRCUS**: volleys of corkscrewing missiles round a transforming jet | ![Valkyrie](docs/screenshots/valkyrie.png) **VALKYRIE**: a fighter turning into GERWALK and battroid on a turntable |
-| ![Bebop](docs/screenshots/bebop.png) **BEBOP**: a red fighter through asteroids and hyperspace gates, swinging on the beat | ![Angel Attack](docs/screenshots/eva.png) **ANGEL ATTACK**: an angel over a sinking city, hex warnings and a sync-ratio meter |
-| ![Hardsuit](docs/screenshots/hardsuit.png) **HARDSUIT**: four armoured skaters against a rogue android on the freeway | ![Police Labor](docs/screenshots/labor.png) **POLICE LABOR**: a patrol robot walks the harbour at dawn |
-| ![Colony](docs/screenshots/gundam.png) **COLONY**: a mobile-suit duel under a turning space colony | ![The Wired](docs/screenshots/wired.png) **THE WIRED**: humming power lines, a dark room of towers, PRESENT DAY |
-| ![Wave Motion](docs/screenshots/yamato.png) **WAVE MOTION**: a space battleship charges its bow gun, and fires | ![On Air](docs/screenshots/radio.png) **ON AIR**: a late-night radio booth riding whatever's playing |
-| ![Switchboard](docs/screenshots/switchboard.png) **SWITCHBOARD**: a 1940s exchange: lamps, cords, NUMBER, PLEASE? | ![Telegraph](docs/screenshots/telegraph.png) **TELEGRAPH**: the key taps out your commands in Morse onto ticker tape |
-| ![Mission Control](docs/screenshots/mission.png) **MISSION CONTROL**: a countdown that runs during your builds, then liftoff | ![Pneumatic Post](docs/screenshots/pneumatic.png) **PNEUMATIC POST**: a capsule down the tubes for every network connection |
-| ![Mainframe](docs/screenshots/mainframe.png) **MAINFRAME**: tape drives and lamp panels keeping pace with your CPU | ![Video Store](docs/screenshots/videostore.png) **VIDEO STORE**: aisles of tapes and a window of TVs, late at night |
-| ![Arcade](docs/screenshots/arcade.png) **ARCADE**: cabinets in attract mode at closing time | ![Pirate Radio](docs/screenshots/pirateradio.png) **PIRATE RADIO**: a broadcast ship rolling on the night sea |
-| ![Numbers Station](docs/screenshots/numbers.png) **NUMBERS STATION**: a shortwave set reading out five-digit groups | ![Night Sky](docs/screenshots/sky.png) **NIGHT SKY**: the stars, planets and Moon over you right now (your time zone's best guess) |
-| ![Data Center](docs/screenshots/datacenter.png) **DATA CENTER**: an endless cold aisle of blinking racks | ![Usenet](docs/screenshots/usenet.png) **USENET**: the newsgroup tree, a newsreader in the margins, searching for your words |
-| ![Defrag](docs/screenshots/defrag.png) **DEFRAG**: a disk optimizer packing clusters, faster while you build | ![Seti](docs/screenshots/seti.png) **SETI**: a radio-search waterfall hunting for a candidate signal |
-| ![Sneakers](docs/screenshots/sneakers.png) **SNEAKERS**: letters resolve, then fly into the anagram: TOO MANY SECRETS | ![Demoparty](docs/screenshots/demoparty.png) **DEMOPARTY**: plasma, rotozoomer, copper bars and vector balls, with greets |
-| ![Ansi Gallery](docs/screenshots/ansi.png) **ANSI GALLERY**: block-art logos and .NFOs drawn at modem speed | ![War Dialer](docs/screenshots/wardialer.png) **WAR DIALER**: a board of 555 numbers dialed one by one, hunting carriers |
-| ![Y2K](docs/screenshots/y2k.png) **Y2K**: the countdown to 2000, then 01-JAN-1900, then the patch | ![Messenger](docs/screenshots/messenger.png) **MESSENGER**: a buddy list, doors opening, chat windows floating by |
-| ![Homepage](docs/screenshots/geocities.png) **HOMEPAGE**: a 1998 homepage: under construction, hit counter, webring | ![Hacker Con](docs/screenshots/defcon.png) **HACKER CON**: a dark con floor, blinking badges, the wall of sheep, CTF scores |
+| ![FILESYSTEM](docs/screenshots/files.png) **FILESYSTEM**: the folder you `cd` into, as towers | ![NETWATCH](docs/screenshots/net.png) **NETWATCH**: your live TCP connections, labelled by service |
+| ![Four panes](docs/screenshots/tiled.png) **Four panes**: each at its own opacity | ![THERMOPTIC](docs/screenshots/thermoptic.png) **THERMOPTIC**: the rooftop dive, cloaking as she falls |
+| ![OUTATIME](docs/screenshots/outatime.png) **OUTATIME**: 88 mph as you type, then it flies off | ![NIGHT SKY](docs/screenshots/sky.png) **NIGHT SKY**: the real stars, planets and Moon over you tonight |
+| ![TRENCH RUN](docs/screenshots/trench.png) **TRENCH RUN**: down the trench, turrets firing, then the exhaust port | ![DATA CENTER](docs/screenshots/datacenter.png) **DATA CENTER**: an endless cold aisle of blinking racks |
+| ![ON AIR](docs/screenshots/radio.png) **ON AIR**: a late-night radio booth riding your music | ![SNEAKERS](docs/screenshots/sneakers.png) **SNEAKERS**: your commands scrambled into anagrams and solved |
 
-Also in the box: THE GRID, NEON CITY, ORBIT, RAVE WAREHOUSE, GIT GALAXY, HIGHWAY, DEEP SEA,
-PROCESS HIVE, 3D PIPES, 3D MAZE and THE STREET.
+### All 96 worlds
+
+Right-click > World, by menu section (NYX also picks them to suit her mood):
+
+- **Cyberspace**: THE GRID, DATASTREAM, GIBSON CORE, ICE WALL, GIT GALAXY, FILESYSTEM, THE GARBAGE FILE, BBS LOBBY, HACK THE PLANET, DATA CENTER, USENET
+- **Cities**: NEON CITY, MANHATTAN 1995, MEGACITY 2049, GROUND ZERO, THE STREET, GIBSON TOWERS, HIGHWAY
+- **Out there**: NIGHT SKY, ORBIT, DEEP SPACE, DEEP SEA
+- **Sci-fi**: OUTATIME, STARFIGHTER, WOPR, SPINNER, NAVIGATOR, EXPLORERS, BLIPVERT, ARRAKIS, MOTION TRACKER, THE REAL
+- **Scene**: DEFRAG, SETI, SNEAKERS, DEMOPARTY, ANSI GALLERY, WAR DIALER, Y2K, MESSENGER, HOMEPAGE, HACKER CON
+- **Old tech**: ON AIR, SWITCHBOARD, TELEGRAPH, MISSION CONTROL, PNEUMATIC POST, MAINFRAME, VIDEO STORE, ARCADE, PIRATE RADIO, NUMBERS STATION
+- **Anime**: NEO-TOKYO, THERMOPTIC, CYBERBRAIN, SPIDER TANK, MISSILE CIRCUS, BEBOP, ANGEL ATTACK, HARDSUIT, POLICE LABOR, COLONY, THE WIRED, WAVE MOTION, VALKYRIE
+- **Arcade**: BATTLEZONE, LIGHT CYCLES, DEATHMATCH, ENDLESS ROAD, ANTI-GRAV RACE, VECTOR TUBE, TRENCH RUN, FREE TRADER, ROCK FIELD, LUNAR LANDER, STUNT TRACK
+- **Visualizers**: RAVE WAREHOUSE, MILKDROP (tunnel, kaleidoscope, starburst), STRANGE ATTRACTOR, DNA HELIX, GAME OF LIFE
+- **Screensavers**: FLYING TOASTERS, MYSTIFY, 3D PIPES, 3D MAZE, 3D FLOWERBOX, LUNATIC FRINGE, NOCTURNE, KEYGEN
+- **Your machine**: NETWATCH, PROCESS HIVE, NEWSWIRE, WORLD NEWS, TRAFFIC MAP
 
 ## Getting Started
 
