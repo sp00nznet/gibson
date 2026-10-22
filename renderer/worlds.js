@@ -607,11 +607,15 @@
   })();
 
   // --- engine ----------------------------------------------------------------
-  const env = { t: 0, speed: 10, level: 0, pulse: 0, bass: 0, mid: 0, high: 0, warp: 0, bright: 1, fs: null, git: null, packets: true };
+  const env = { t: 0, speed: 10, level: 0, pulse: 0, bass: 0, mid: 0, high: 0, hush: 0, warp: 0, bright: 1, fs: null, git: null, packets: true };
   let cur = 'grid', prev = null, trans = 1, last = 0, source = () => ({});
 
   function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; F = H * 0.9; }
+  // On battery (not charging) the worlds run at about 20 fps; hidden, they don't run at all.
+  let lowPower = false;
+  try { navigator.getBattery().then((b) => { const f = () => { lowPower = !b.charging; }; f(); b.onchargingchange = f; }); } catch { /* no battery API */ }
   function frame(ts) {
+    if ((typeof document !== 'undefined' && document.hidden) || (lowPower && ts - last < 45)) return requestAnimationFrame(frame);
     const dt = Math.min(0.05, (ts - last) / 1000 || 0.016); last = ts;
     Object.assign(env, source(dt));
     // The dance: every world hears the music. bass/mid/high come from the spectrum (synth or
@@ -619,9 +623,11 @@
     // thickens the lines, the highs brighten them, and trails stretch on the beat.
     const d = env.dance === false ? 0 : 1, sp = env.spec, band = (a, b) => { let m = 0; for (let i = a; i < b; i++) m += sp[i]; return m / (b - a); };
     for (const [key, v] of [['bass', sp ? band(0, 6) : env.pulse * 0.6], ['mid', sp ? band(12, 28) : 0], ['high', sp ? band(30, sp.length) : 0]]) env[key] += (v * d - env[key]) * Math.min(1, dt * 14);
-    const step = dt * (1 + d * env.pulse * 0.6);
-    env.t += step; env.speed = 8 + env.level * 70 + env.warp * 60;
-    env.bright = 0.75 + env.pulse * 0.25 + env.high * 0.3;
+    // Calm: typing hard dims the world and slows it, easing in and out, so the text wins.
+    env.hush += ((env.calm !== false && env.typing > 3.5 ? 1 : 0) - env.hush) * Math.min(1, dt * 1.5);
+    const step = dt * (1 + d * env.pulse * 0.6) * (1 - env.hush * 0.5);
+    env.t += step; env.speed = (8 + env.level * 70 + env.warp * 60) * (1 - env.hush * 0.5);
+    env.bright = (0.75 + env.pulse * 0.25 + env.high * 0.3) * (1 - env.hush * 0.45);
     F = H * 0.9 * (1 + d * (env.pulse * 0.025 + env.bass * 0.02));
     g.globalCompositeOperation = 'source-over';
     g.fillStyle = `rgba(0,0,0,${(0.28 + (1 - env.level) * 0.25) * (1 - d * env.pulse * 0.35)})`; g.fillRect(0, 0, W, H);

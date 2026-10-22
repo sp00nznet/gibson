@@ -4,6 +4,39 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-22
+
+### Added
+- Free-form panes: up to 16 per tab. Split right or down (Alt+Shift+= / Alt+Shift+-), drag the
+  gaps to resize, Alt+arrows to move between panes, Alt+Shift+arrows to nudge a gap. Drag a
+  pane's header onto another pane to dock it beside that one or swap the two; × closes it.
+  Right-click > Panes > Even grid lays out 1 to 16.
+- Restore last session (on by default, right-click > Tabs): tabs, pane layouts, each pane's
+  shell and folder, and its scrollback, dimmed above a "restored session" rule.
+- Shell integration (right-click > Commands; on by default): PowerShell, cmd, bash and zsh
+  start with a small script that marks each prompt, command and exit code and says the folder.
+  A dot beside each prompt says how its command ended (green worked, pink failed); Ctrl+Up /
+  Ctrl+Down jump between prompts; Copy command output takes one command's output. Errors,
+  finished-command alerts and the folder world now go by what the shell says, not guesses.
+  Your own profile still runs and isn't touched.
+- Right-click > Commands > Save scrollback... and Clear scrollback.
+- Command palette (Ctrl+Shift+Space, or the top of the right-click menu): every action, world,
+  shell and SSH host in one fuzzy-searched list, with its key; recent picks come first.
+- Rebindable keys: "keys" in config.json, e.g. { "newtab": "Ctrl+Alt+T", "world": null };
+  null unbinds, a list binds several. Alt+arrows and Ctrl+Up/Down reach the shell whenever
+  GIBSON has no use for them.
+- SSH hosts from ~/.ssh/config (and "sshHosts" in config.json) in the new-tab menu and palette.
+- Search all panes (Ctrl+Shift+H): every pane in every tab at once, live, with match case and
+  regex; pick a match to jump there and select it.
+- Find (Ctrl+Shift+F) gets match-case and regex toggles.
+- Tabs show a dot when a background tab has new output, BEL when it rings; a bell in the tab
+  you're on flashes its pane. A program's own title (vim, ssh, htop...) shows on its tab.
+- Drop files from Explorer onto a pane to type their paths, quoted for that shell (WSL gets /mnt/c/...).
+- Settings > Copy on select, Right-click pastes (Shift+right-click for the menu), Readable text
+  (dim colours lifted so they read over the worlds; on by default).
+- Look > Calm worlds while typing (on): fast typing dims and slows the world; worlds pause when
+  the window is hidden and run at about 20 fps on battery.
+
 ## [0.19.0] - 2026-10-21
 
 ### Added

@@ -12,6 +12,8 @@ const { llmLine, DEFAULT_MODEL, DEFAULT_BASE } = require('./llm');
 const agent = require('./agent');
 const local = require('./local');
 const sys = require('./sysinfo');
+const Keys = require('./renderer/keys');
+const ssh = require('./ssh');
 const { createIrc, defaultNick } = require('./irc');
 
 // One config folder for source runs and packaged builds (whose app name is GIBSON).
@@ -24,7 +26,7 @@ const SHOT = arg('--shot');            // headless: render offscreen, save a PNG
 const SHOT_AT = Number(arg('--at') || 9);
 const WORLD = arg('--world');          // force a starting world (screenshots)
 const MUTE = argv.includes('--mute');
-const PANES = Number(arg('--panes') || 1); // start with 1-4 panes
+const PANES = Number(arg('--panes') || 1); // start with 1-16 panes (an even grid)
 const UNFRAMED = argv.includes('--unframed');
 const TABS = Number(arg('--tabs') || 1); // start with this many tabs (screenshots)
 const CHAT = arg('--chat');
@@ -98,6 +100,10 @@ function writeCfg(key, v) {
   if (SHOT) return;
   try { const u = JSON.parse(fs.readFileSync(cfg.file, 'utf8')); u[key] = v; fs.writeFileSync(cfg.file, JSON.stringify(u, null, 2)); } catch { /* config unreadable: keep it for this session */ }
 }
+// Last session's tabs (right-click > Tabs > Restore last session): each a pane tree whose leaves
+// are { profile, cwd, text }, text being the tail of that pane's scrollback.
+const sessionFile = () => path.join(app.getPath('userData'), 'session.json');
+function readSession() { try { const s = JSON.parse(fs.readFileSync(sessionFile(), 'utf8')); return Array.isArray(s) ? s : null; } catch { return null; } }
 const panes = new Map(); // pane id -> { term, cwd }
 
 // Screenshots must not show the real machine: no home folder, no username, no hostname.
@@ -171,7 +177,8 @@ function detectShells() {
   return out;
 }
 let profiles = [];
-const findProfile = (name) => profiles.find((p) => p.name === name);
+const findProfile = (name) => profiles.find((p) => p.name === name) || sshFind(name);
+const sshFind = (name) => { const h = /^ssh:(.+)$/.exec(name || '') && ssh.sshHosts(cfg.sshHosts).find((x) => x.name === name.slice(4)); return h ? ssh.sshProfile(h) : null; };
 // The default: defaultShell by name, else the profile running the legacy `shell` setting.
 function defaultProfile() {
   return findProfile(cfg.defaultShell) || profiles.find((p) => path.basename(p.shell).toLowerCase() === path.basename(cfg.shell).toLowerCase())
@@ -192,6 +199,35 @@ function piped(prof, cwd) {
   };
 }
 const BBS = path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), 'bbs', 'bbs.js');
+// Shell integration: each shell starts with a small script (shell/) that marks every prompt,
+// command and exit code (OSC 133) and says its folder (OSC 7, or 9;9). The user's own profile
+// still runs first. PowerShell gets it as -EncodedCommand, which no execution policy blocks.
+// WSL and custom bash/PowerShell command lines are left as they are.
+const SHELL_DIR = path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), 'shell');
+function integrate(prof) {
+  if (cfg.shellint === false || prof.pipes) return prof;
+  const exe = path.basename(prof.shell || '').toLowerCase().replace(/\.exe$/, ''), args = (prof.args || []).slice(), env = { ...(prof.env || {}) };
+  try {
+    if (exe === 'powershell' || exe === 'pwsh') {
+      if (args.some((a) => /^-(f|file|e|ec|encodedcommand)$/i.test(a))) return prof;
+      let script = fs.readFileSync(path.join(SHELL_DIR, 'gibson.ps1'), 'utf8');
+      const i = args.findIndex((a) => /^-c(ommand)?$/i.test(a));
+      if (i >= 0) { script = `${args[i + 1]}\n${script}`; args.splice(i, 2); } // the screenshots' made-up prompt, then ours
+      if (!args.some((a) => /^-noexit$/i.test(a))) args.push('-NoExit');
+      args.push('-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64'));
+    } else if (exe === 'cmd') {
+      if (args.length) return prof;
+      env.PROMPT = `$e]133;D$e\\$e]9;9;$P$e\\$e]133;A$e\\${env.PROMPT || process.env.PROMPT || '$P$G'}$e]133;B$e\\`; // cmd can't say an exit code
+    } else if (exe === 'bash') {
+      if (args.some((a) => !['-l', '--login', '-i'].includes(a))) return prof;
+      if (args.some((a) => a === '-l' || a === '--login')) env.GIBSON_LOGIN = '1'; // a login shell ignores --rcfile, so ours runs the login files
+      args.splice(0, args.length, '--rcfile', path.join(SHELL_DIR, 'gibson.bash').replace(/\\/g, '/'), '-i');
+    } else if (exe === 'zsh') {
+      env.GIBSON_ZDOTDIR = process.env.ZDOTDIR || os.homedir(); env.ZDOTDIR = path.join(SHELL_DIR, 'zsh');
+    } else return prof;
+  } catch { return prof; }
+  return { ...prof, args, env };
+}
 // A pane's output goes to whichever window holds it now (pane.wc), and the last stretch of it is
 // kept (pane.buf) so a tab torn off into a new window comes up showing what it showed before.
 function spawnShell(id, opts, wc) {
@@ -214,9 +250,10 @@ function spawnShell(id, opts, wc) {
   };
   let term;
   try {
-    if (pane.prof.pipes) term = pane.term = piped(pane.prof, pane.cwd); else term = pane.term = pty.spawn(pane.prof.shell, pane.prof.args || [], {
+    const run = integrate(pane.prof);
+    if (pane.prof.pipes) term = pane.term = piped(pane.prof, pane.cwd); else term = pane.term = pty.spawn(run.shell, run.args || [], {
       name: 'xterm-256color', cols: 100, rows: 30, cwd: pane.cwd,
-      env: { ...process.env, TERM_PROGRAM: 'GIBSON', ...(SHOT ? { PS1: 'hacker@gibson:~$ ' } : {}), ...(pane.prof.env || {}) },
+      env: { ...process.env, TERM_PROGRAM: 'GIBSON', ...(SHOT ? { PS1: 'hacker@gibson:~$ ' } : {}), ...(run.env || {}) },
     });
   } catch (e) { // a profile pointing at a shell that is not there
     send(`\x1b[31m-- cannot start ${pane.prof.shell}: ${e.message} --\x1b[0m\r\n`);
@@ -284,15 +321,17 @@ function listDir(dir) {
   } catch { return []; }
 }
 
-// Ctrl+Shift + these keys, by key code (the shifted characters differ by keyboard layout)
-const CODEKEYS = { BracketRight: 'music:next', BracketLeft: 'music:prev', Equal: 'music:volup', Minus: 'music:voldown' };
-const HOTKEYS = { I: 'irc', C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', K: 'synth', G: 'sysmon', F: 'find', U: 'frame', S: 'scroller', L: 'logo', D: 'packets', P: 'music:toggle', J: 'music:source', A: 'broadcast', Z: 'zoompane' };
-// Ctrl + these (no Shift): font size, as in every terminal and browser
-const ZOOMKEYS = { Equal: 'font:up', NumpadAdd: 'font:up', Minus: 'font:down', NumpadSubtract: 'font:down', Digit0: 'font:reset', Numpad0: 'font:reset' };
+// The keymap (renderer/keys.js): defaults merged with config.json's "keys". Built at startup.
+let keymap = {};
+const accel = (a) => Keys.keyOf(keymap, a) || undefined; // for menus: the action's first key
 const TAB_COLOURS = [['None', ''], ['Pink', '#ff2e88'], ['Green', '#39ff9c'], ['Ice', '#36d6ff'], ['Gold', '#ffc448'], ['Violet', '#a860ff'], ['Red', '#ff3864']];
 
 // New tab with a given shell: one item per profile.
-const shellItems = (act) => profiles.map((p) => ({ label: p.name + (p.name === defaultProfile().name ? '  (default)' : ''), click: act('newtab:' + p.name) }));
+const shellItems = (act) => {
+  const hosts = SHOT ? [] : ssh.sshHosts(cfg.sshHosts);
+  return [...profiles.map((p) => ({ label: p.name + (p.name === defaultProfile().name ? '  (default)' : ''), click: act('newtab:' + p.name) })),
+    ...(hosts.length ? [{ type: 'separator' }, ...hosts.map((h) => ({ label: 'SSH: ' + h.name, click: act('newtab:ssh:' + h.name) }))] : [])];
+};
 
 // Right-click menu. The page sends its current state; clicks come back as hotkey actions.
 // GitHub settings sync (sync.js). The token is kept encrypted by the OS (safeStorage), never in
@@ -492,12 +531,22 @@ function nyxMenu(st, act, item) {
   ];
 }
 
-function contextMenu(st) {
-  const act = (a) => () => toMenuWindow('hotkey', a);
-  const item = (label, a, key, extra) => ({ label, click: act(a), accelerator: key && 'Ctrl+Shift+' + key, registerAccelerator: false, ...extra });
-  return Menu.buildFromTemplate([
+function contextMenu(st) { return Menu.buildFromTemplate(menuTemplate(st)); }
+function menuTemplate(st) {
+  const act = (a) => Object.assign(() => toMenuWindow('hotkey', a), { action: a }); // .action: for the palette
+  const item = (label, a, _key, extra) => ({ label, click: act(a), accelerator: accel(a), registerAccelerator: false, ...extra });
+  return [
+    item('Command palette...', 'palette'),
     item('Copy', 'copy', 'C', { enabled: st.selection }), item('Paste', 'paste', 'V'),
     item('Find...', 'find', 'F'),
+    item('Search all panes...', 'search:all', 'H'),
+    { label: 'Commands', submenu: [ // shell integration's marks
+      item('Previous prompt', 'prompt:prev', null, { enabled: st.shellint !== false }), item('Next prompt', 'prompt:next', null, { enabled: st.shellint !== false }),
+      item('Copy command output', 'output:copy', null, { enabled: st.shellint !== false }),
+      item('Save scrollback...', 'output:save'), item('Clear scrollback', 'scrollback:clear'),
+      { type: 'separator' },
+      item('Shell integration (new shells)', 'shellint', null, { type: 'checkbox', checked: st.shellint !== false }),
+    ] },
     { type: 'separator' },
     item('New tab', 'newtab', 'T'),
     { label: 'New tab with', submenu: shellItems(act) },
@@ -507,11 +556,15 @@ function contextMenu(st) {
       { label: 'Colour', submenu: TAB_COLOURS.map(([label, c]) => ({ label, type: 'radio', checked: c === (st.tabColor || ''), click: act('tabcolor:' + c) })) },
       { type: 'separator' },
       { label: 'Open these tabs on start', click: act('tabs:save') },
+      { label: 'Restore last session (tabs, panes, folders, scrollback)', type: 'checkbox', checked: cfg.restoreSession !== false, click: () => writeCfg('restoreSession', cfg.restoreSession === false) },
       { label: `Forget the start tabs${cfg.startupTabs.length ? ` (${cfg.startupTabs.length})` : ''}`, enabled: cfg.startupTabs.length > 0, click: () => writeCfg('startupTabs', []) },
       { label: 'Default shell', submenu: profiles.map((p) => ({ label: p.name, type: 'radio', checked: p.name === defaultProfile().name, click: () => writeCfg('defaultShell', p.name) })) },
     ] },
     { label: 'Panes', submenu: [
-      ...[1, 2, 3, 4].map((n) => ({ label: `${n}`, type: 'radio', checked: n === st.panes, accelerator: `Ctrl+Shift+${n}`, registerAccelerator: false, click: act('panes:' + n) })),
+      { label: 'Split right', accelerator: accel('split:right'), registerAccelerator: false, click: act('split:right'), enabled: st.panes < 16 },
+      { label: 'Split down', accelerator: accel('split:down'), registerAccelerator: false, click: act('split:down'), enabled: st.panes < 16 },
+      { label: 'Close this pane', accelerator: accel('closepane'), registerAccelerator: false, click: act('closepane') },
+      { label: 'Even grid', submenu: [1, 2, 3, 4, 6, 8, 9, 12, 16].map((n) => ({ label: `${n} pane${n > 1 ? 's' : ''}`, type: 'radio', checked: n === st.panes, accelerator: accel('panes:' + n), registerAccelerator: false, click: act('panes:' + n) })) },
       { type: 'separator' },
       item('Zoom this pane', 'zoompane', 'Z', { type: 'checkbox', checked: st.zoomed, enabled: st.panes > 1 }),
       item('Type into every pane', 'broadcast', 'A', { type: 'checkbox', checked: st.broadcast, enabled: st.panes > 1 }),
@@ -532,11 +585,11 @@ function contextMenu(st) {
       { label: 'Choose music folder...', click: act('music:pick') },
       { type: 'separator' },
       item('Play / pause', 'music:toggle', 'P'),
-      { label: 'Next track', accelerator: 'Ctrl+Shift+]', registerAccelerator: false, click: act('music:next') },
-      { label: 'Previous track', accelerator: 'Ctrl+Shift+[', registerAccelerator: false, click: act('music:prev') },
+      { label: 'Next track', accelerator: accel('music:next'), registerAccelerator: false, click: act('music:next') },
+      { label: 'Previous track', accelerator: accel('music:prev'), registerAccelerator: false, click: act('music:prev') },
       { label: 'Shuffle', type: 'checkbox', checked: st.shuffle, click: act('music:shuffle') },
-      { label: 'Volume up', accelerator: 'Ctrl+Shift+=', registerAccelerator: false, click: act('music:volup') },
-      { label: 'Volume down', accelerator: 'Ctrl+Shift+-', registerAccelerator: false, click: act('music:voldown') },
+      { label: 'Volume up', accelerator: accel('music:volup'), registerAccelerator: false, click: act('music:volup') },
+      { label: 'Volume down', accelerator: accel('music:voldown'), registerAccelerator: false, click: act('music:voldown') },
     ] },
     { label: 'IRC lobby', submenu: [
       item('Show', 'irc', 'I', { type: 'checkbox', checked: st.irc }),
@@ -551,6 +604,7 @@ function contextMenu(st) {
       item('Logo', 'logo', 'L', { type: 'checkbox', checked: st.logo }),
       item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
       { label: 'Ships flying by', type: 'checkbox', checked: st.ships, click: act('ships') },
+      { label: 'Calm worlds while typing', type: 'checkbox', checked: st.calm, click: act('calm') },
       item('System monitor', 'sysmon', 'G', { type: 'checkbox', checked: st.sysmon }),
       { label: 'Cigarette while compiling', type: 'checkbox', checked: cfg.cigarette !== false, click: act('cigarette') },
       item('Matrix rain', 'rain', 'R'),
@@ -566,19 +620,39 @@ function contextMenu(st) {
         { type: 'separator' }, item('Cycle', 'opacity', 'O'),
       ] },
       { label: 'Text size', submenu: [
-        { label: 'Bigger', accelerator: 'Ctrl+=', registerAccelerator: false, click: act('font:up') },
-        { label: 'Smaller', accelerator: 'Ctrl+-', registerAccelerator: false, click: act('font:down') },
-        { label: `Reset (${DEFAULTS.fontSize})`, accelerator: 'Ctrl+0', registerAccelerator: false, click: act('font:reset') },
+        { label: 'Bigger', accelerator: accel('font:up'), registerAccelerator: false, click: act('font:up') },
+        { label: 'Smaller', accelerator: accel('font:down'), registerAccelerator: false, click: act('font:down') },
+        { label: `Reset (${DEFAULTS.fontSize})`, accelerator: accel('font:reset'), registerAccelerator: false, click: act('font:reset') },
       ] },
-      { label: 'Fullscreen', accelerator: 'F11', registerAccelerator: false, click: act('fullscreen') },
+      { label: 'Fullscreen', accelerator: accel('fullscreen'), registerAccelerator: false, click: act('fullscreen') },
     ] },
     { type: 'separator' },
     { label: 'Settings', submenu: [
       { label: 'Ask before pasting several lines', type: 'checkbox', checked: cfg.pasteGuard !== false, click: act('pasteguard') },
+      { label: 'Copy on select', type: 'checkbox', checked: st.copyselect, click: act('copyselect') },
+      { label: 'Right-click pastes (Shift+right-click for this menu)', type: 'checkbox', checked: st.rclickpaste, click: act('rclickpaste') },
+      { label: 'Readable text (lift dim colours)', type: 'checkbox', checked: st.readable, click: act('readable') },
       { label: 'Open config.json', click: () => shell.openPath(cfg.file) },
+      { label: 'Keys... ("keys" in config.json, then restart)', click: () => shell.openPath(cfg.file) },
       syncMenu(),
     ] },
-  ]);
+  ];
+}
+// The menu, flat, for the command palette: every clickable item as 'Music › Shuffle', plus the
+// keymap's actions that have no menu item. Kept until the next request so palette:run can call them.
+let paletteItems = [];
+function paletteList(st) {
+  const out = [], seen = new Set();
+  const walk = (items, trail) => { for (const it of items) {
+    if (!it || it.type === 'separator' || it.enabled === false || !it.label) continue;
+    const label = [...trail, it.label.trim()].join(' › ');
+    if (it.submenu) walk(it.submenu, [...trail, it.label.trim()]);
+    else if (it.click) { if (it.click.action) seen.add(it.click.action); out.push({ label, key: it.accelerator || (it.click.action && accel(it.click.action)) || '', checked: !!it.checked, run: it.click }); }
+  } };
+  walk(menuTemplate(st), []);
+  for (const [a, label] of Object.entries(Keys.LABELS)) if (!seen.has(a)) out.push({ label, key: accel(a) || '', checked: false, run: () => toMenuWindow('hotkey', a) });
+  paletteItems = out;
+  return out.map(({ label, key, checked }, id) => ({ id, label, key, checked }));
 }
 
 // Switching the lobby's mode re-reads config.json's irc section, so edits there take effect.
@@ -646,14 +720,9 @@ function createWindow(extra) {
 function hotkeys(win) {
   win.webContents.on('before-input-event', (e, i) => {
     if (i.type !== 'keyDown') return;
-    const k = i.key.length === 1 ? i.key.toUpperCase() : i.key;
-    const digit = /^Digit([1-4])$/.exec(i.code); // Ctrl+Shift+1..4: i.key is '!' etc, so read the code
-    if (digit && i.control && i.shift) { e.preventDefault(); return win.webContents.send('hotkey', 'panes:' + digit[1]); }
-    if (i.control && i.shift && CODEKEYS[i.code]) { e.preventDefault(); return win.webContents.send('hotkey', CODEKEYS[i.code]); }
-    if (i.control && !i.shift && !i.alt && ZOOMKEYS[i.code]) { e.preventDefault(); return win.webContents.send('hotkey', ZOOMKEYS[i.code]); }
-    const tabKey = i.control && ((i.key === 'Tab' && (i.shift ? 'prevtab' : 'nexttab')) || (i.key === 'PageDown' && 'nexttab') || (i.key === 'PageUp' && 'prevtab'));
-    if (tabKey) { e.preventDefault(); return win.webContents.send('hotkey', tabKey); }
-    if (k === 'F11' || (i.control && i.shift && HOTKEYS[k])) { e.preventDefault(); win.webContents.send('hotkey', k === 'F11' ? 'fullscreen' : HOTKEYS[k]); }
+    const a = keymap[Keys.fromInput(i)];
+    if (!a || Keys.SOFT.has(a)) return; // soft keys: the page decides (renderer/keys.js)
+    e.preventDefault(); win.webContents.send('hotkey', a);
   });
 }
 
@@ -663,6 +732,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'gibson-music', privileges: { st
 app.whenReady().then(() => {
   local.init(path.join(app.getPath('userData'), 'models'));
   cfg = loadConfig();
+  keymap = Keys.keymap(cfg.keys);
   if (MUSIC) cfg.music = { ...cfg.music, source: 'folder', folder: path.resolve(MUSIC) };
   profiles = detectShells();
   for (const p of cfg.profiles || []) if (p && p.name && p.shell) { const i = profiles.findIndex((x) => x.name === p.name); if (i >= 0) profiles[i] = p; else profiles.push(p); }
@@ -674,7 +744,7 @@ app.whenReady().then(() => {
     cfg: { ...cfg, llm: { ...cfg.llm, apiKey: undefined }, irc: { ...cfg.irc, password: undefined }, ...(torn ? { boot: false, ircOpen: false } : {}) },
     idBase: x.idBase, adopt: x.adopt || null, detach: DETACH && !torn, rejoin: REJOIN && torn,
     user: SHOT ? 'hacker' : os.userInfo().username, host: SHOT ? 'gibson' : os.hostname(), cwd: home, panes: PANES, tabs: TABS, chat: CHAT, unframed: UNFRAMED,
-    startTabs: cfg.startupTabs, defaults: { fontSize: DEFAULTS.fontSize }, defaultShell: SHOT ? '' : defaultProfile().name,
+    startTabs: cfg.startupTabs, session: !SHOT && !torn && cfg.restoreSession !== false ? readSession() : null, defaults: { fontSize: DEFAULTS.fontSize }, defaultShell: SHOT ? '' : defaultProfile().name,
     shot: !!SHOT, world: WORLD, irc: IRC && !torn, cmd: torn ? null : CMD, mute: MUTE || torn, bootShot: argv.includes('--boot'),
     ...(torn ? { startTabs: [], panes: 1, tabs: 1, chat: null } : {}),
     };
@@ -685,7 +755,7 @@ app.whenReady().then(() => {
   // window adopts them (pty:adopt hands over the buffer and the live feed at once). A window's last
   // tab can only move into another window, and that window closes behind it (never the main one).
   ipcMain.handle('tab:detach', (e, tab, x, y) => {
-    const ids = (tab && Array.isArray(tab.ids) ? tab.ids : []).filter((id) => panes.has(id)).slice(0, 4);
+    const ids = (tab && Array.isArray(tab.ids) ? tab.ids : []).filter((id) => panes.has(id)).slice(0, 16);
     if (!ids.length) return false;
     const src = winOf(e), pt = SHOT ? { x, y } : screen.getCursorScreenPoint();
     const inside = (b) => pt.x >= b.x && pt.x < b.x + b.width && pt.y >= b.y && pt.y < b.y + b.height;
@@ -693,7 +763,7 @@ app.whenReady().then(() => {
       || (SHOT && tab.into ? BrowserWindow.getAllWindows().find((o) => o !== src) : null);
     if (tab.last && (!to || src === win)) return false;
     for (const id of ids) Object.assign(panes.get(id), { wc: null, wcId: null });
-    const adopt = { ids, c: Number(tab.c) || 0.5, r: Number(tab.r) || 0.5, opts: tab.opts || {} };
+    const adopt = { ids, tree: tab.tree || null, opts: tab.opts || {} }; // tree: the pane layout, leaves are pane ids
     if (to) { to.webContents.send('tab:adopt', adopt); to.focus(); } else createWindow({ adopt, x: pt.x - 120, y: pt.y - 20 });
     if (tab.last) setTimeout(() => src.close(), 50);
     return true;
@@ -706,6 +776,16 @@ app.whenReady().then(() => {
   ipcMain.on('pty:write', (_e, id, d) => { const p = panes.get(id); if (p && p.term) p.term.write(d); });
   ipcMain.on('pty:resize', (_e, id, c, r) => { try { panes.get(id).term.resize(c, r); } catch { /* shell restarting */ } });
   ipcMain.on('pty:line', (_e, id, line) => { const p = panes.get(id); if (p) trackCd(p, line); });
+  ipcMain.on('pty:cwd', (_e, id, dir) => { // the shell's own word for its folder (shell integration)
+    const p = panes.get(id); if (!p || typeof dir !== 'string') return;
+    if (process.platform === 'win32') dir = dir.replace(/^\/([a-z])(?=\/|$)/i, '$1:').replace(/\//g, '\\'); // Git Bash: /c/x is C:\x
+    if (isDir(dir)) p.cwd = dir;
+  });
+  ipcMain.handle('output:save', async (e, text) => { // a pane's scrollback, to a file the user picks
+    const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(e.sender), { title: 'Save scrollback', defaultPath: path.join(app.getPath('documents'), `gibson-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.txt`), filters: [{ name: 'Text', extensions: ['txt', 'log'] }] });
+    if (r.canceled || !r.filePath) return null;
+    fs.writeFileSync(r.filePath, String(text)); return r.filePath;
+  });
   // `nfo <file>`: the raw bytes (the page decodes CP437). Under 1 MB, relative to the pane's folder.
   ipcMain.handle('fs:read', (_e, id, file) => {
     try { const f = linkPath(id, String(file)); return fs.statSync(f).size < 1048576 ? fs.readFileSync(f) : null; } catch { return null; }
@@ -722,11 +802,24 @@ app.whenReady().then(() => {
   ipcMain.on('irc:command', (_e, line, target) => { if (irc) irc.command(String(line), String(target || '')); });
   ipcMain.handle('fs:list', (_e, id) => { const d = (panes.get(id) || { cwd: home }).cwd; return { cwd: SHOT ? 'C:\\GIBSON' : d, entries: listDir(d) }; });
   ipcMain.on('cfg:save', (_e, key, v) => { // view choices remembered across restarts
-    if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'dance', 'sysmon', 'ships', 'hollywood', 'crt', 'keyclick', 'chimes', 'bios', 'bsod', 'classic', 'cigarette', 'fontSize', 'pasteGuard', 'ircOpen'].includes(key)) writeCfg(key, v);
+    if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'dance', 'calm', 'sysmon', 'ships', 'hollywood', 'crt', 'keyclick', 'chimes', 'bios', 'bsod', 'classic', 'readable', 'copyselect', 'rclickpaste', 'shellint', 'cigarette', 'fontSize', 'pasteGuard', 'ircOpen'].includes(key)) writeCfg(key, v);
     if (key === 'nyxLeet') writeCfg('nyx', { ...cfg.nyx, leet: !!v });
   });
   // The tabs as they are now become the start tabs. The page sends each tab's first pane id
   // and pane count; the shell and folder are known here.
+  // The page sends its tabs every 30 s and on the way out; leaves arrive as { id, text } and the
+  // shell and folder are filled in here. The BBS isn't kept. Scrollback is trimmed to fit 4 MB.
+  ipcMain.on('session:save', (_e, list) => {
+    if (SHOT || !Array.isArray(list)) return;
+    const build = (keep) => list.slice(0, 32).map((t) => {
+      const cell = (c) => { const p = c && panes.get(c.id); return p && !p.prof.once ? { profile: p.prof.name, cwd: p.cwd, text: String(c.text || '').slice(-keep) } : null; };
+      const node = (n, depth) => (!n || depth > 20 ? null : n.p !== undefined ? { p: cell(n.p) } : { dir: n.dir, ratio: n.ratio, a: node(n.a, depth + 1), b: node(n.b, depth + 1) });
+      return { ...(t.name ? { name: String(t.name).slice(0, 40) } : {}), ...(t.color ? { color: String(t.color).slice(0, 9) } : {}), tree: node(t.tree, 0) };
+    });
+    let keep = 200000, s = JSON.stringify(build(keep));
+    while (s.length > 4e6 && keep > 1000) s = JSON.stringify(build((keep >>= 1)));
+    try { fs.writeFileSync(sessionFile(), s); } catch { /* not this time */ }
+  });
   ipcMain.on('tabs:save', (_e, list) => {
     const tabs = list.map((t) => { const p = panes.get(t.id); return p && !p.prof.once && { profile: p.prof.name, cwd: p.cwd, panes: t.panes, ...(t.name ? { name: String(t.name).slice(0, 40) } : {}), ...(t.color ? { color: String(t.color).slice(0, 9) } : {}) }; }).filter(Boolean);
     writeCfg('startupTabs', tabs);
@@ -760,6 +853,8 @@ app.whenReady().then(() => {
     });
   });
   ipcMain.on('menu', (e, st) => { menuWc = e.sender; contextMenu(st).popup({ window: winOf(e) }); });
+  ipcMain.handle('palette:list', (e, st) => { menuWc = e.sender; return paletteList(st); });
+  ipcMain.on('palette:run', (e, id) => { menuWc = e.sender; const it = paletteItems[id]; if (it) it.run(); });
   ipcMain.handle('nyx:llm', (_e, event) => llmLine(brain(), event).catch(() => null));
   // `nyx <message>`: the tool loop (agent.js), or the plain one-liner if the brain can't do tools.
   ipcMain.handle('nyx:agent', async (e, ev) => {

@@ -59,25 +59,35 @@ body.unframed #frame { inset: 0; border: none; box-shadow: none; transform: none
 #tabs #newtab, #tabs #shells { color: #ff7ab8; }
 #tabs #shells { padding: 3px 6px; }
 
-/* each tab is a grid of 1 to 4 panes; only the active tab is shown */
+/* each tab holds 1 to 16 panes, placed by app.js from its split tree; only the active tab is shown */
 #termwrap { flex: 1; min-height: 0; position: relative; }
-.tab { position: absolute; inset: 0; display: grid; grid-template: 1fr / 1fr; gap: 6px; }
+.tab { position: absolute; inset: 0; }
 .tab.hidden { display: none; }
-.tab:not(.n1) { padding: 6px; }
-.tab.n2 { grid-template: 1fr / 1fr 1fr; }
-.tab.n3, .tab.n4 { grid-template: 1fr 1fr / 1fr 1fr; }
-.tab.n3 .pane:first-child { grid-row: span 2; }
-.tab.n3 .splitter + .splitter + .pane { grid-row: span 2; }
-/* drag handles between panes (app.js splitters); --c and --r are the split fractions */
-.splitter { position: absolute; z-index: 3; display: none; }
-.splitter.vsplit { top: 0; bottom: 0; width: 8px; left: calc(var(--c) * 100% - 4px); cursor: col-resize; }
-.splitter.hsplit { left: 0; right: 0; height: 8px; top: calc(var(--r) * 100% - 4px); cursor: row-resize; }
-.tab.n3.n3 .hsplit { left: calc(var(--c) * 100%); }
-.tab:not(.n1):not(.zoomed) .vsplit, .tab.n3:not(.zoomed) .hsplit, .tab.n4:not(.zoomed) .hsplit { display: block; }
+.tab > .pane { position: absolute; box-sizing: border-box; }
+/* drag handles on the gaps between panes (app.js layout) */
+.splitter { position: absolute; z-index: 3; }
+.splitter.vsplit { cursor: col-resize; }
+.splitter.hsplit { cursor: row-resize; }
 .splitter:hover { background: rgba(255, 46, 136, 0.35); }
+/* each pane's header strip (2+ panes): its folder and a close x; drag it onto another pane */
+.phead { display: none; position: absolute; left: 0; right: 0; top: 0; height: 15px; z-index: 4; cursor: grab; user-select: none;
+  padding: 0 6px; font: 10px/15px 'Cascadia Mono', Consolas, monospace; letter-spacing: 1px; color: rgba(139, 255, 196, 0.55);
+  background: rgba(57, 255, 156, 0.06); border-bottom: 1px solid rgba(57, 255, 156, 0.12); white-space: nowrap; overflow: hidden; }
+.tab:not(.n1) .phead { display: block; }
+.tab:not(.n1) .pane { padding-top: 18px !important; }
+.pane.focus .phead { color: #ffd6ec; background: rgba(255, 46, 136, 0.12); }
+.phead .px { position: absolute; right: 5px; top: 0; cursor: pointer; color: #ff7ab8; }
+.phead .px:hover { color: #fff; }
+.pane.dragging { opacity: 0.45; }
+.dropzone { position: absolute; z-index: 6; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  font: bold 13px 'Cascadia Mono', Consolas, monospace; letter-spacing: 4px; color: #fff; text-shadow: 0 0 6px #ff2e88;
+  background: rgba(255, 46, 136, 0.18); border: 2px dashed rgba(255, 46, 136, 0.85); box-sizing: border-box; }
+/* classic window style: the drawn title bar is the strip; its close button closes the pane */
+body.classic .phead { display: block; top: 2px; left: 2px; right: 2px; height: 18px; background: none; border: none; color: transparent; }
+body.classic .phead .px { right: 3px; top: 2px; width: 16px; height: 14px; color: transparent; }
+body.classic .tab .pane { padding-top: 26px !important; }
 /* one pane zoomed to fill the tab (Ctrl+Shift+Z) */
 .tab.zoomed .pane:not(.zoom) { display: none; }
-.tab.zoomed .pane.zoom { grid-area: 1 / 1 / -1 / -1; }
 /* typing into every pane (Ctrl+Shift+A) */
 .tab.broadcast .pane { border-color: rgba(255, 196, 72, 0.8) !important; box-shadow: 0 0 10px rgba(255, 196, 72, 0.35); }
 /* find bar (Ctrl+Shift+F) */
@@ -205,3 +215,11 @@ body.classic .pane::after { /* minimize, maximize, close: three bevelled grey bu
     linear-gradient(#c0c0c0, #c0c0c0) 0 0 / 16px 14px no-repeat, linear-gradient(#c0c0c0, #c0c0c0) 17px 0 / 16px 14px no-repeat, linear-gradient(#c0c0c0, #c0c0c0) 34px 0 / 16px 14px no-repeat,
     linear-gradient(#404040, #404040) 1px 1px / 16px 14px no-repeat, linear-gradient(#404040, #404040) 18px 1px / 16px 14px no-repeat, linear-gradient(#404040, #404040) 35px 1px / 16px 14px no-repeat;
 }
+
+/* Shell integration: a dot left of each prompt, how its command ended (renderer/shellint.js) */
+.si-dot { pointer-events: none; overflow: visible !important; }
+.si-dot::before { content: ''; position: absolute; left: -7px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: #6a7a72; }
+.si-dot.ok::before { background: #39ff9c; box-shadow: 0 0 4px #39ff9c; }
+.si-dot.fail::before { background: #ff2e88; box-shadow: 0 0 5px #ff2e88; }
+.si-dot.run::before { background: #8a9a92; animation: si-run 0.8s steps(2) infinite; }
+@keyframes si-run { 50% { opacity: 0.2; } }

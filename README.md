@@ -26,10 +26,20 @@ window, and a Da Vinci red alert when you type `rm -rf`.
 
 It is mostly for fun. But some of it is genuinely handy:
 
-- **It's a proper terminal.** PowerShell, cmd, bash, zsh, each WSL distro; tabs you can rename,
-  colour, drag, tear off into their own windows (or drop into another one) and save; up to four resizable panes per tab; find in scrollback; type into every
-  pane at once; clickable `file:line` links that open your editor; a ping when a long command
-  finishes while you're elsewhere; a paste guard; a quake-style summon key.
+- **It's a proper terminal.** PowerShell, cmd, bash, zsh, each WSL distro, and your SSH hosts.
+  Tabs you can rename, colour, drag, tear off into their own windows and save; up to sixteen
+  free-form panes per tab that you split, resize and drag around to rearrange; your whole session
+  (tabs, layouts, folders, scrollback) back the next time you start.
+- **It knows your commands.** Shell integration marks every prompt with a dot for how it ended,
+  jumps between prompts with Ctrl+Up/Down, and copies or saves a command's output. NYX, the
+  folder world and the finished-command alerts go by what the shell says, not guesses.
+- **It finds things.** Find in a pane with highlighted matches, regex and match case, or search
+  every pane in every tab at once and jump to the hit.
+- **It gets out of your way.** A command palette (Ctrl+Shift+Space) for every action, keys you
+  can rebind, readable text over the busiest world, worlds that calm down while you type, and the
+  everyday bits: clickable `file:line` links, file drop with proper quoting, copy on select, tab
+  activity and program titles, a ping when a long command finishes elsewhere, a paste guard, a
+  quake-style summon key, and a system monitor (Ctrl+Shift+G).
 - **NETWATCH** draws every live TCP connection your machine has, labelled by service. A new kind
   of connection flares, and NYX will mention it.
 - **PROCESS HIVE** is a honeycomb of your running programs: height is memory, heat is CPU, and a
@@ -39,17 +49,22 @@ It is mostly for fun. But some of it is genuinely handy:
 
 ## Status
 
-**0.19.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
+**0.20.0, alpha.** Windows is the tested platform (PowerShell via ConPTY). macOS and Linux builds
 are produced and smoke-tested by CI, but nobody has lived in them yet.
 
 | | |
 |---|---|
 | Real shell (node-pty), xterm.js 6 with WebGL, links, Unicode 11 | done |
-| Tabs, each with 1 to 4 tiled panes; per-pane opacity; framed or full-window; hideable logo and scroller | done |
+| Tabs with up to 16 free-form panes each: split, resize, drag to dock or swap; per-pane opacity; framed or full-window | done |
+| Restore last session: tabs, layouts, folders and scrollback | done |
+| Shell integration (OSC 133/7) for PowerShell, cmd, bash, zsh: prompt marks, exit-code dots, prompt jumps, command output | done (PowerShell 5.1 tested; bash, zsh, pwsh 7 untested) |
+| Command palette, rebindable keys, SSH hosts from ~/.ssh/config | done |
+| Find with regex/case and highlight-all; search across every pane and tab | done |
+| Tab activity and bell marks, program titles, file drop, copy on select, readable-text contrast | done |
 | Talk to NYX from any pane: `nyx <message>` | done |
 | 96 wireframe worlds in eleven menu sections, some drawn from your live system, your RSS feeds or tonight's real sky | done |
 | Every world dances to the music: the kick, the bass and the highs | done |
-| Find, text size, pane resize/zoom, broadcast input, file links, finished-command alerts, paste guard, quake key | done |
+| Text size, pane zoom, broadcast input, file links, finished-command alerts, paste guard, quake key | done |
 | `dial` a BBS (with a door game), `wardial`, `nfo`, `scan`, the cookie monster, the red alert | done |
 | IRC lobby beside the terminal: a simulated #hackers, or a real server | done (real mode tested against a local server) |
 | Tracker modules (.mod .xm .s3m .it) in the jukebox; a Winamp-style player | done |
@@ -179,10 +194,16 @@ Everything below is also on the **right-click menu**.
 | double-click a tab | rename it (Enter keeps it, Esc backs out, empty goes back to the folder name); also right-click > Rename tab |
 | drag a tab | move it; drop it outside the window and it opens in a window of its own, shells still running. Right-click > Tab colour to colour it |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | next / previous tab (also `Ctrl+PageDown` / `Ctrl+PageUp`) |
-| `Ctrl+Shift+1`..`4` | that many panes in this tab, opening in the focused pane's folder. Drag the gaps to resize; right-click > Panes > Even out |
+| `Ctrl+Shift+Space` | the command palette: every action, world, shell and SSH host, fuzzy-searched, with its key (also the top of the right-click menu) |
+| `Ctrl+Shift+1`..`4` | an even grid of that many panes (right-click > Panes > Even grid goes up to 16), opening in the focused pane's folder |
+| `Alt+Shift+=` / `Alt+Shift+-` | split the focused pane right / down (up to 16 panes per tab) |
+| `Alt+arrows` / `Alt+Shift+arrows` | move to the pane in that direction / nudge the gap. When there's nowhere to go, the key goes to your shell |
+| drag a pane's header | onto another pane: dock it beside that one (left/right/top/bottom half) or swap the two (middle). The × closes it; drag the gaps to resize |
+| `Ctrl+Up` / `Ctrl+Down` | jump to the previous / next prompt (shell integration; otherwise the key goes to your shell) |
 | `Ctrl+Shift+Z` | zoom the focused pane to fill the tab, and back |
 | `Ctrl+Shift+A` | type into every pane in this tab at once (gold borders while it's on) |
-| `Ctrl+Shift+F` | find in scrollback: Enter next, Shift+Enter previous, Esc closes |
+| `Ctrl+Shift+F` | find in scrollback, every match highlighted; Aa matches case, .* is a regex. Enter next, Shift+Enter previous, Esc closes |
+| `Ctrl+Shift+H` | search every pane in every tab at once; Enter or click jumps to the match |
 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | text bigger / smaller / reset (or Ctrl+mouse wheel); remembered |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | copy / paste. More than one line asks first (right-click to turn that off) |
 | click a `file:line` | opens it in your editor at that line (VS Code if it's installed, or `editor` in the settings) |
@@ -223,6 +244,14 @@ shell.
 
 **Extras**, each a checkbox on the right-click menu:
 
+- **Shell integration** (right-click > Commands, on): PowerShell, cmd, bash and zsh start with a small script (your own profile still runs, untouched) that marks each prompt, command and exit code. A dot by each prompt says how it ended (green worked, pink failed); **Commands** also has Copy command output, Save scrollback... and Clear scrollback.
+- **Restore last session** (right-click > Tabs, on): tabs, pane layouts, each pane's folder and its scrollback come back next time.
+- **Tabs** show a dot when a background tab has new output and BEL when it rings; programs (vim, ssh, htop) put their own title on the tab.
+- **Drop files** from Explorer onto a pane to type their paths, quoted for that shell.
+- **Settings**: Copy on select, Right-click pastes (Shift+right-click for the menu), Readable text (dim colours lifted over the worlds; on).
+- **Look > Calm worlds while typing** (on): fast typing dims and slows the world; it pauses when the window is hidden and runs at ~20 fps on battery.
+- **SSH hosts** from `~/.ssh/config` (and `"sshHosts"` in config.json) are in the new-tab ▾ menu and the palette.
+- **Keys** are rebindable: `"keys"` in config.json, e.g. `{ "newtab": "Ctrl+Alt+T", "world": null }` (null unbinds, a list binds several; names are in `renderer/keys.js`). Restart to apply.
 - **Look > Hollywood hacking**: every command gets the movie treatment: hex spinning, BYPASSING FIREWALL..., then ACCESS GRANTED (or DENIED when it fails).
 - **Look > CRT mode**: heavier scanlines, a curved dark edge, glowing phosphor and flicker.
 - **Look > Blue screen on errors**: a failed command flashes a fake blue screen over its pane (at most every 20 s).

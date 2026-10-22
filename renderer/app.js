@@ -12,8 +12,9 @@
   const go = (w) => { if (!B.world && cfg.nyxWorlds !== false && w) Worlds.go(Array.isArray(w) ? w[Math.floor(Math.random() * w.length)] : w); };
   let music = null, pulse = 0, warp = 0;
   // On/off extras, each a right-click checkbox saved under its own key; the value is its default.
-  const EXTRAS = { hollywood: false, crt: false, keyclick: false, chimes: true, bios: false, bsod: false, classic: false };
+  const EXTRAS = { hollywood: false, crt: false, keyclick: false, chimes: true, bios: false, bsod: false, classic: false, readable: true, copyselect: false, rclickpaste: false, shellint: true };
   const flag = (k) => (cfg[k] === undefined ? EXTRAS[k] : !!cfg[k]);
+  const READABLE = 4.5; // the contrast 'Readable text' guarantees, against black
   const applyLook = () => { document.body.classList.toggle('crt', flag('crt')); document.body.classList.toggle('classic', flag('classic')); };
   applyLook();
   const sfx = new Sfx(() => (B.mute || B.shot ? 0 : cfg.music.volume));
@@ -24,6 +25,7 @@
   const TERM_OPTS = {
     fontFamily: cfg.fontFamily, fontSize: cfg.fontSize, cursorBlink: true, cursorStyle: 'block',
     allowProposedApi: true, allowTransparency: true, scrollback: 5000,
+    minimumContrastRatio: flag('readable') ? READABLE : 1, // dim colours get lifted so they read over the worlds
     theme: {
       background: '#00000000', foreground: '#b8ffd9', cursor: '#ff2e88', cursorAccent: '#000', selectionBackground: '#ff2e8866',
       scrollbarSliderBackground: '#39ff9c22', scrollbarSliderHoverBackground: '#39ff9c44', scrollbarSliderActiveBackground: '#ff2e8866',
@@ -38,9 +40,8 @@
   // opts: { profile, cwd } for the tab's shells; blank means the default shell in the home folder.
   // adopt: pane ids of running shells (a tab torn off another window) instead of new ones.
   function makeTab(opts, adopt) {
-    const t = { panes: [], focused: null, cwdName: '', opts: opts || {}, c: 0.5, r: 0.5, el: document.createElement('div'), btn: document.createElement('button') };
+    const t = { panes: [], focused: null, cwdName: '', opts: opts || {}, root: null, handles: new Map(), el: document.createElement('div'), btn: document.createElement('button') };
     t.el.className = 'tab n1'; $('termwrap').appendChild(t.el);
-    splitters(t);
     t.btn.className = 'tabbtn'; t.btn.title = 'double-click renames, drag to reorder, out of the window or onto another, middle-click closes';
     t.btn.draggable = true; // drag a tab onto another to move it there
     t.btn.ondragstart = (e) => { dragged = t; e.dataTransfer.effectAllowed = 'move'; };
@@ -62,41 +63,125 @@
     t.btn.ondblclick = (e) => { if (!e.target.classList.contains('x')) renameTab(t); };
     $('tabs').insertBefore(t.btn, $('newtab'));
     tabs.push(t);
-    if (adopt) { for (const id of adopt) makePane(t, null, id); t.el.className = 'tab n' + t.panes.length; } else makePane(t, t.opts.from);
+    if (adopt) { for (const id of adopt) makePane(t, null, id); t.root = Panes.grid(t.panes); } else makePane(t, t.opts.from);
+    layout(t);
     label(t);
     window.gibson.listDir(t.panes[0].id).then((fs) => { t.cwdName = baseName(fs.cwd); label(t); });
     return t;
   }
   function label(t) {
     const shell = t.opts.profile && t.opts.profile !== B.defaultShell ? ` (${t.opts.profile})` : '';
-    const name = t.opts.name || `${t.cwdName || 'shell'}${shell}`; // a name you gave it wins over the folder
-    const badge = (t.broadcast ? '\u21f6 ' : '') + (t.done ? '\u25cf ' : ''); // typing into all panes; a command finished in the background
+    const prog = (t.focused || t.panes[0] || {}).title; // what the program running there calls itself (vim, ssh...)
+    const name = t.opts.name || prog || `${t.cwdName || 'shell'}${shell}`; // a name you gave it wins, then the program's title, then the folder
+    // typing into all panes; a command finished in the background; it rang the bell; new output while you were elsewhere
+    const badge = (t.broadcast ? '\u21f6 ' : '') + (t.done ? '\u25cf ' : '') + (t.bell ? 'BEL ' : '') + (t.busy && !t.done && !t.bell ? '\u2022 ' : '');
     t.btn.firstChild.textContent = `${badge}${tabs.indexOf(t) + 1}:${name}${t.panes.length > 1 ? ' [' + t.panes.length + ']' : ''}`;
     t.btn.style.setProperty('--tabc', t.opts.color || '');
     t.btn.classList.toggle('coloured', !!t.opts.color);
   }
-  // Pane sizes: the column and row split as fractions, dragged by two handles.
-  function splitters(t) {
-    for (const [cls, key] of [['vsplit', 'c'], ['hsplit', 'r']]) {
-      const h = document.createElement('div'); h.className = 'splitter ' + cls; t.el.appendChild(h);
-      h.onpointerdown = (e) => {
-        e.preventDefault(); h.setPointerCapture(e.pointerId);
-        h.onpointermove = (m) => {
-          const r = t.el.getBoundingClientRect();
-          t[key] = Math.max(0.15, Math.min(0.85, key === 'c' ? (m.clientX - r.left) / r.width : (m.clientY - r.top) / r.height));
-          layout(t);
-        };
-        h.onpointerup = () => { h.onpointermove = null; };
-      };
-    }
-    layout(t);
+  // Panes sit where the tab's split tree (renderer/panes.js) puts them, GAP px apart. Each split
+  // gets a handle on its gap to drag; zoomed, the zoomed pane takes the whole tab.
+  const GAP = 6;
+  function box(s, x, y, w, h, g) { // fractions of the tab -> position, gaps taken out (g = 0: edge to edge)
+    s.left = `calc(${x} * (100% - ${g}px) + ${g}px)`; s.top = `calc(${y} * (100% - ${g}px) + ${g}px)`;
+    s.width = `calc(${w} * (100% - ${g}px) - ${g}px)`; s.height = `calc(${h} * (100% - ${g}px) - ${g}px)`;
   }
   function layout(t) {
-    const n = t.panes.length, cols = n > 1 && !t.zoom, rows = n > 2 && !t.zoom;
-    t.el.style.gridTemplateColumns = cols ? `${t.c}fr ${1 - t.c}fr` : '';
-    t.el.style.gridTemplateRows = rows ? `${t.r}fr ${1 - t.r}fr` : '';
-    t.el.style.setProperty('--c', t.c); t.el.style.setProperty('--r', t.r);
+    const n = t.panes.length, R = Panes.rects(t.root), seen = new Set();
+    for (const c of [...t.el.classList]) if (/^n\d+$/.test(c)) t.el.classList.remove(c);
+    t.el.classList.add('n' + n);
+    for (const r of R.panes) {
+      if (t.zoom && r.p.el.classList.contains('zoom')) box(r.p.el.style, 0, 0, 1, 1, n > 1 ? GAP : 0);
+      else box(r.p.el.style, r.x, r.y, r.w, r.h, n > 1 ? GAP : 0);
+    }
+    if (!t.zoom) for (const sp of R.splits) {
+      let h = t.handles.get(sp.node);
+      if (!h) { h = document.createElement('div'); t.el.appendChild(h); t.handles.set(sp.node, h); dragGap(t, sp.node, h); }
+      seen.add(sp.node); h.rect = sp;
+      const row = sp.node.dir === 'row', b = row ? sp.x + sp.w * sp.node.ratio : sp.y + sp.h * sp.node.ratio, S = `(100% - ${GAP}px)`;
+      h.className = 'splitter ' + (row ? 'vsplit' : 'hsplit');
+      Object.assign(h.style, row
+        ? { left: `calc(${b} * ${S} + ${GAP / 2 - 4}px)`, top: `calc(${sp.y} * ${S} + ${GAP}px)`, width: '8px', height: `calc(${sp.h} * ${S} - ${GAP}px)` }
+        : { top: `calc(${b} * ${S} + ${GAP / 2 - 4}px)`, left: `calc(${sp.x} * ${S} + ${GAP}px)`, height: '8px', width: `calc(${sp.w} * ${S} - ${GAP}px)` });
+    }
+    for (const [node, h] of t.handles) if (!seen.has(node)) { h.remove(); t.handles.delete(node); }
     t.el.classList.toggle('zoomed', !!t.zoom);
+  }
+  function dragGap(t, node, h) {
+    h.onpointerdown = (e) => {
+      e.preventDefault(); h.setPointerCapture(e.pointerId); const sp = h.rect;
+      h.onpointermove = (m) => {
+        const r = t.el.getBoundingClientRect(), row = node.dir === 'row';
+        const f = row ? ((m.clientX - r.left - GAP / 2) / (r.width - GAP) - sp.x) / sp.w : ((m.clientY - r.top - GAP / 2) / (r.height - GAP) - sp.y) / sp.h;
+        node.ratio = Math.max(0.08, Math.min(0.92, f)); layout(t);
+      };
+      h.onpointerup = () => { h.onpointermove = null; };
+    };
+  }
+  // Each pane's header strip: its folder and a close x; drag it onto another pane to dock beside
+  // that one (the half you're over) or swap with it (the middle). In the classic window style the
+  // drawn title bar is the strip.
+  function paneHead(p) {
+    const h = document.createElement('div'); h.className = 'phead';
+    h.innerHTML = '<span class="pname"></span><span class="px" title="close this pane">×</span>';
+    p.el.appendChild(h); p.head = h;
+    setTimeout(() => window.gibson.listDir(p.id).then((fs) => paneName(p, fs.cwd)), 400); // once its shell has a folder
+    h.lastChild.onpointerdown = (e) => e.stopPropagation();
+    h.lastChild.onclick = () => closePaneUI(p);
+    h.onpointerdown = (e) => {
+      if (e.button !== 0 || p.tab.panes.length < 2) return;
+      e.preventDefault(); h.setPointerCapture(e.pointerId);
+      const x0 = e.clientX, y0 = e.clientY; let ghost = null, over = null, zone = null;
+      h.onpointermove = (m) => {
+        if (!ghost && Math.hypot(m.clientX - x0, m.clientY - y0) < 6) return;
+        if (!ghost) { ghost = document.createElement('div'); ghost.className = 'dropzone'; p.tab.el.appendChild(ghost); p.el.classList.add('dragging'); }
+        over = p.tab.panes.find((q) => { const r = q.el.getBoundingClientRect(); return m.clientX >= r.left && m.clientX < r.right && m.clientY >= r.top && m.clientY < r.bottom; });
+        zone = over && over !== p ? dropZone(over.el.getBoundingClientRect(), m.clientX, m.clientY) : null;
+        showZone(ghost, over, zone);
+      };
+      h.onpointerup = () => {
+        h.onpointermove = h.onpointerup = null;
+        if (ghost) { ghost.remove(); p.el.classList.remove('dragging'); }
+        if (zone) movePane(p, over, zone);
+      };
+    };
+  }
+  // The middle fifth of a pane swaps; otherwise the nearest edge docks there.
+  function dropZone(r, x, y) {
+    const fx = (x - r.left) / r.width, fy = (y - r.top) / r.height;
+    if (Math.abs(fx - 0.5) < 0.2 && Math.abs(fy - 0.5) < 0.2) return 'swap';
+    const d = { left: fx, right: 1 - fx, up: fy, down: 1 - fy };
+    return Object.keys(d).sort((a, b) => d[a] - d[b])[0];
+  }
+  function showZone(g, q, z) {
+    g.style.display = z ? '' : 'none'; if (!z) return;
+    let x = q.el.offsetLeft, y = q.el.offsetTop, w = q.el.offsetWidth, h = q.el.offsetHeight;
+    if (z === 'left' || z === 'right') { w /= 2; if (z === 'right') x += w; } else if (z === 'up' || z === 'down') { h /= 2; if (z === 'down') y += h; }
+    Object.assign(g.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+    g.textContent = z === 'swap' ? 'SWAP' : 'DOCK';
+  }
+  function movePane(p, q, z) {
+    const t = p.tab;
+    if (z === 'swap') t.root = Panes.swap(t.root, p, q);
+    else t.root = Panes.split(Panes.remove(t.root, p), q, p, z === 'left' || z === 'right' ? 'row' : 'col', z === 'left' || z === 'up');
+    unzoom(t); layout(t); p.term.focus();
+  }
+  const unzoom = (t) => { t.zoom = false; for (const x of t.panes) x.el.classList.remove('zoom'); };
+  // Split the focused pane: a new shell beside it (right) or under it (down), in its folder.
+  function splitPane(dir) {
+    if (tab.panes.length >= Panes.MAX) return nyx.ctx.say(`${Panes.MAX} panes is the limit. Even I need to see.`, 'playful');
+    const p = focused, q = makePane(tab, p.id);
+    tab.root = Panes.split(tab.root, p, q, dir); unzoom(tab); layout(tab); label(tab);
+    setFocus(q); q.term.focus();
+  }
+  // Close one pane (the last one takes its tab); focus goes to the pane next to it.
+  function closePaneUI(p) {
+    const t = p.tab;
+    if (t.panes.length < 2) return closeTab(t);
+    const next = ['left', 'up', 'right', 'down'].map((d) => Panes.neighbour(t.root, p, d)).find(Boolean) || t.panes.find((x) => x !== p);
+    closePane(p); unzoom(t); if (t.panes.length < 2) t.broadcast = false;
+    layout(t); label(t);
+    if (t === tab) { focused = null; setFocus(next); next.term.focus(); } else t.focused = next;
   }
   // Rename in place: Enter keeps it, Escape backs out, an empty name goes back to the folder.
   // A one-line text box over the page (Electron has no prompt()). Enter keeps, Escape drops.
@@ -124,9 +209,10 @@
     inp.onclick = (e) => e.stopPropagation();
   }
   function switchTab(t) {
+    if (tab && tab !== t) tab.leftAt = Date.now(); // its activity dot waits a second: the last of the output shouldn't count
     tab = t;
     for (const x of tabs) { x.el.classList.toggle('hidden', x !== t); x.btn.classList.toggle('on', x === t); }
-    if (t.done) { t.done = false; label(t); }
+    if (t.done || t.busy || t.bell) { t.done = t.busy = t.bell = false; label(t); }
     $('tabs').classList.toggle('solo', tabs.length < 2);
     focused = null; setFocus(t.focused || t.panes[0]); focused.term.focus();
   }
@@ -141,7 +227,7 @@
   // Off into another window (or a new one), shells still running: this window lets go without
   // closing them. Main says no for the only tab unless it landed on another window.
   async function detach(t, x, y, into) {
-    const ok = await window.gibson.detach({ ids: t.panes.map((p) => p.id), c: t.c, r: t.r, opts: t.opts, last: tabs.length < 2, into }, x, y);
+    const ok = await window.gibson.detach({ ids: t.panes.map((p) => p.id), tree: Panes.save(t.root, (p) => p.id), opts: t.opts, last: tabs.length < 2, into }, x, y);
     if (!ok || !tabs.includes(t)) return;
     for (const p of t.panes) { p.ro.disconnect(); p.term.dispose(); }
     if (tabs.length < 2) return; // the window closes behind it
@@ -153,7 +239,7 @@
   const baseName = (dir) => dir.split(/[\\/]/).filter(Boolean).pop() || dir;
 
   // from: the pane whose folder the new shell starts in (split from here)
-  function makePane(t, from, adoptId) {
+  function makePane(t, from, adoptId, own) { // own: { profile, cwd } for this pane alone (a restored session)
     const id = adoptId || nextId++, el = document.createElement('div');
     el.className = 'pane'; el.dataset.title = 'GIBSON Prompt'; t.el.appendChild(el); // the title is for the classic window style
     const term = new Terminal(TERM_OPTS), fit = new FitAddon.FitAddon(), search = new SearchAddon.SearchAddon();
@@ -165,8 +251,11 @@
     try { const gl = new WebglAddon.WebglAddon(); gl.onContextLoss(() => gl.dispose()); term.loadAddon(gl); } catch { /* DOM renderer is fine */ }
     const chat = document.createElement('div'); chat.className = 'nyxchat'; el.appendChild(chat);
     const p = { id, el, term, search, tab: t, chat, line: '', lastCmd: '', outTail: '', errorSeen: false, lastOut: 0, cmdAt: 0 };
+    paneComforts(p);
+    ShellInt.attach(p, { cwd: shellCwd, done: shellDone });
+    term.attachCustomKeyEventHandler((e) => softKey(p, e)); // the soft keys; see softKey
     if (adoptId) window.gibson.adopt(id).then((buf) => { if (buf) term.write(buf); }); // what it showed in the old window
-    else window.gibson.open(id, { ...t.opts, from });
+    else window.gibson.open(id, { ...t.opts, from, ...own });
     // Pastes go through the guard, whichever way they arrive (keys, menu, middle click).
     el.addEventListener('paste', (e) => { e.preventDefault(); e.stopImmediatePropagation(); pasteInto(p, e.clipboardData.getData('text/plain')); }, true);
     const doFit = () => { try { fit.fit(); window.gibson.resize(id, term.cols, term.rows); } catch { /* hidden */ } };
@@ -199,15 +288,18 @@
       else if (d[0] !== '\x1b') p.line += d.replace(/[\x00-\x1f]/g, '');
     });
     p.el.style.setProperty('--term-alpha', p.opacity = cfg.opacity ?? 0.86);
-    t.panes.push(p);
+    t.panes.push(p); if (!t.root) t.root = Panes.leaf(p); // more panes join the tree where the caller splits
+    paneHead(p);
     return p;
   }
   // The command line as the screen shows it: the cursor's row plus any rows it wrapped from,
   // up to the cursor (PSReadLine draws its grey predictions to the right of it). The prompt
   // ends at its first > $ # or % plus a space. Untrimmed, so its length is what the shell
   // holds. null when no prompt is recognised.
-  // ponytail: prompt-shape heuristic; a prompt hook (OSC 133) would be exact.
+  // With shell integration it's exact: from the end of the prompt (OSC 133 B) to the cursor.
+  // ponytail: without it, a prompt-shape heuristic.
   function typedLine(p) {
+    const exact = ShellInt.typed(p); if (exact !== null) return exact;
     const b = p.term.buffer.active;
     let y = b.baseY + b.cursorY, text = b.getLine(y).translateToString(false, 0, b.cursorX);
     while (y > 0 && b.getLine(y).isWrapped) { y--; text = b.getLine(y).translateToString(false) + text; }
@@ -242,6 +334,51 @@
     if (cfg.pasteGuard !== false && lines > 1 && !confirm(`Paste ${lines} lines into the shell? Each line runs as it lands.`)) return;
     p.term.paste(text);
   }
+  // A pane's comforts: the title its program sets, the bell, files dropped on it, copy on select.
+  // ponytail: titles that are just the shell's own exe (ConPTY sets those) are ignored, so tabs keep their folder names.
+  function paneComforts(p) {
+    const { term, el } = p;
+    term.onTitleChange((s) => {
+      p.title = /\.exe$|powershell|^cmd$|command prompt/i.test(s) ? '' : s.slice(0, 32);
+      if (p.title) el.dataset.title = p.title; // the classic window style's title bar (and a pane header, if there is one)
+      label(p.tab);
+    });
+    term.onBell(() => {
+      if (p.tab !== tab) { p.tab.bell = true; label(p.tab); return; }
+      el.classList.remove('bellflash'); void el.offsetWidth; el.classList.add('bellflash'); // restart the flash
+    });
+    term.onSelectionChange(() => { const s = term.getSelection(); if (s && flag('copyselect')) navigator.clipboard.writeText(s); });
+    // Only files from the desktop: tabs and panes being dragged around carry no 'Files'.
+    el.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+    el.addEventListener('drop', (e) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      e.preventDefault();
+      const paths = [...e.dataTransfer.files].map((f) => window.gibson.pathOf(f)).filter(Boolean);
+      if (!paths.length) return;
+      term.paste(TermKit.quotePaths(paths, TermKit.shellKind(p.tab.opts.profile || B.defaultShell, /Windows/.test(navigator.userAgent) ? 'win32' : '')) + ' ');
+      term.focus();
+    });
+  }
+  const applyReadable = () => { for (const x of allPanes()) x.term.options.minimumContrastRatio = flag('readable') ? READABLE : 1; };
+  // Every pane in every tab, searched at once; picking a match goes there and selects it.
+  function searchAll() {
+    const list = allPanes();
+    TermKit.openGlobalSearch({
+      seed: focused.term.getSelection().split('\n')[0],
+      panes: () => list.map((p) => {
+        const n = p.tab.panes.length > 1 ? ` / pane ${p.tab.panes.indexOf(p) + 1}` : '';
+        return { label: `${tabs.indexOf(p.tab) + 1}:${p.tab.btn.firstChild.textContent.replace(/^\S*\d+:/, '')}${n}`, lines: () => { const b = p.term.buffer.active, out = []; for (let i = 0; i < b.length; i++) out.push(b.getLine(i).translateToString(true)); return out; } };
+      }),
+      jump: (i, m) => {
+        const p = list[i]; if (!p || !tabs.includes(p.tab)) return;
+        if (p.tab !== tab) switchTab(p.tab);
+        setFocus(p); p.term.focus();
+        p.term.scrollToLine(Math.max(0, m.row - Math.floor(p.term.rows / 2)));
+        p.term.select(m.start, m.row, m.end - m.start);
+      },
+      onClose: () => focused.term.focus(),
+    });
+  }
   // Find in scrollback: a bar over the top of the focused pane. Enter next, Shift+Enter back, Esc shuts.
   const FIND_DECOR = { matchBackground: '#ff2e8855', activeMatchBackground: '#ffc448aa', matchOverviewRuler: '#ff2e88', activeMatchColorOverviewRuler: '#ffc448' };
   function openFind(p) {
@@ -251,7 +388,9 @@
       bar.innerHTML = '<input placeholder="find"><span class="count"></span><button data-d="-1" title="previous (Shift+Enter)">&#9650;</button><button data-d="1" title="next (Enter)">&#9660;</button><button data-d="0" title="close (Esc)">&times;</button>';
       p.el.appendChild(bar);
       const inp = bar.firstChild, count = bar.children[1];
-      const go = (dir) => { const o = { decorations: FIND_DECOR }; if (dir < 0) p.search.findPrevious(inp.value, o); else p.search.findNext(inp.value, o); };
+      const opts = { regex: false, caseSensitive: false }; // the Aa and .* toggles
+      const go = (dir) => { const o = { ...opts, decorations: FIND_DECOR }; if (dir < 0) p.search.findPrevious(inp.value, o); else p.search.findNext(inp.value, o); };
+      for (const b of TermKit.toggles(opts, () => go(1))) bar.insertBefore(b, count);
       const shut = () => { p.search.clearDecorations(); bar.remove(); p.term.focus(); };
       p.search.onDidChangeResults(({ resultIndex, resultCount }) => { count.textContent = resultCount ? `${resultIndex + 1}/${resultCount}` : inp.value ? 'none' : ''; });
       inp.oninput = () => go(1);
@@ -272,22 +411,26 @@
 
   function closePane(p) {
     p.ro.disconnect(); p.term.dispose(); p.el.remove(); window.gibson.close(p.id);
-    p.tab.panes.splice(p.tab.panes.indexOf(p), 1);
+    p.tab.panes.splice(p.tab.panes.indexOf(p), 1); p.tab.root = Panes.remove(p.tab.root, p);
     if (p.tab.focused === p) p.tab.focused = null;
   }
   function setFocus(p) {
     if (focused === p) return;
     focused = p; p.tab.focused = p;
     for (const x of p.tab.panes) x.el.classList.toggle('focus', x === p);
-    window.gibson.listDir(p.id).then((fs) => { worldEnv.fs = fs; Worlds.refreshFiles(); p.tab.cwdName = baseName(fs.cwd); p.el.dataset.title = `GIBSON Prompt - ${p.tab.cwdName}`; label(p.tab); });
+    window.gibson.listDir(p.id).then((fs) => { worldEnv.fs = fs; Worlds.refreshFiles(); p.tab.cwdName = baseName(fs.cwd); paneName(p, fs.cwd); label(p.tab); });
     refreshGit(p);
   }
-  // Growing adds panes; shrinking closes the newest ones, never the focused one.
+  // A pane's folder: its header strip and its classic title bar.
+  const paneName = (p, dir) => { const n = baseName(dir); p.el.dataset.title = `GIBSON Prompt - ${n}`; if (p.head) p.head.firstChild.textContent = n; };
+  // An even grid of n panes (1 to 16). Growing adds panes; shrinking closes the newest ones,
+  // never the focused one. The panes keep their order, so a grid rearranges rather than reshuffles.
   function setPanes(n) {
-    n = Math.max(1, Math.min(4, n));
+    n = Math.max(1, Math.min(Panes.MAX, n | 0 || 1));
     while (tab.panes.length < n) makePane(tab, focused && focused.id);
     while (tab.panes.length > n) closePane(tab.panes.slice().reverse().find((p) => p !== focused));
-    tab.el.className = 'tab n' + n; tab.zoom = false; for (const x of tab.panes) x.el.classList.remove('zoom');
+    const order = Panes.leaves(tab.root); for (const p of tab.panes) if (!order.includes(p)) order.push(p);
+    tab.root = Panes.grid(order); unzoom(tab);
     if (n < 2) tab.broadcast = false;
     layout(tab); label(tab);
     focused.term.focus();
@@ -296,21 +439,36 @@
   window.gibson.onData((id, d) => {
     const p = allPanes().find((x) => x.id === id); if (!p) return;
     p.term.write(d); act.output(d.length); p.lastOut = Date.now();
+    if (p.tab !== tab && !p.tab.busy && Date.now() - (p.tab.leftAt || 0) > 1000) { p.tab.busy = true; label(p.tab); } // a dot on its tab
     const plain = d.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07/g, '');
     p.outTail = (p.outTail + plain).slice(-2000);
-    if (!p.errorSeen && p.lastCmd && /(error|not recognized|command not found|fatal:|exception|failed|denied)/i.test(plain)) {
-      p.errorSeen = true; Worlds.signal('error'); chime('error'); if (flag('bsod')) bsod(p); nyx.event('error', { cmd: p.lastCmd, output: p.outTail }, true); ircPanel.event('error', p.lastCmd);
-    }
+    if (!p.errorSeen && p.lastCmd && /(error|not recognized|command not found|fatal:|exception|failed|denied)/i.test(plain)) failed(p);
   });
+  function failed(p) { // the last command went wrong: said by its output, or by its exit code (shell integration)
+    p.errorSeen = true; Worlds.signal('error'); chime('error'); if (flag('bsod')) bsod(p); nyx.event('error', { cmd: p.lastCmd, output: p.outTail }, true); ircPanel.event('error', p.lastCmd);
+  }
+  // Shell integration's word (renderer/shellint.js): the folder as the shell says it, and how
+  // each command ended. A pane without it keeps guessing from `cd` lines and output.
+  function shellCwd(p, dir) {
+    window.gibson.cwd(p.id, dir);
+    if (dir === p.cwd) return;
+    const first = p.cwd === undefined; p.cwd = dir;
+    if (first) return; // the first prompt: no change of folder to show
+    window.gibson.listDir(p.id).then((fs) => {
+      worldEnv.fs = fs; go('files'); Worlds.refreshFiles();
+      p.tab.cwdName = baseName(fs.cwd); paneName(p, fs.cwd); label(p.tab); refreshGit(p); ircPanel.event('cd', p.tab.cwdName);
+    });
+  }
+  function shellDone(p, rec) { if (rec.code && p.lastCmd && !p.errorSeen) failed(p); }
 
   function onCommand(p, cmd) {
     p.lastCmd = cmd; p.errorSeen = false; p.cmdAt = cmd ? Date.now() : 0;
     if (cmd) worldEnv.cmd = { text: cmd, at: Date.now() }; // the telegraph taps it out
     if (cmd && flag('hollywood')) hollywood(p);
     window.gibson.line(p.id, cmd);
-    if (NYX_KIND(cmd) === 'cd') setTimeout(async () => {
+    if (NYX_KIND(cmd) === 'cd' && !ShellInt.live(p)) setTimeout(async () => { // with shell integration, shellHooks.cwd does this
       worldEnv.fs = await window.gibson.listDir(p.id); go('files'); Worlds.refreshFiles();
-      p.tab.cwdName = baseName(worldEnv.fs.cwd); label(p.tab); refreshGit(p); ircPanel.event('cd', p.tab.cwdName);
+      p.tab.cwdName = baseName(worldEnv.fs.cwd); paneName(p, worldEnv.fs.cwd); label(p.tab); refreshGit(p); ircPanel.event('cd', p.tab.cwdName);
     }, 250);
     if (/^git\b/i.test(cmd)) setTimeout(() => refreshGit(p), 1200); // new commits ignite in the galaxy
     if (cmd) setTimeout(() => { if (!p.errorSeen && p.lastCmd === cmd) Worlds.signal('ok'); }, 1500);
@@ -400,9 +558,36 @@
   }
   let nyxPane = null; // the pane whose `nyx` question is in flight: her tools work in its folder
 
-  const adoptTab = (a) => { const t = makeTab(a.opts, a.ids); t.c = a.c; t.r = a.r; layout(t); switchTab(t); };
+  const adoptTab = (a) => {
+    const t = makeTab(a.opts, a.ids), byId = new Map(t.panes.map((p) => [p.id, p]));
+    if (a.tree) { const r = Panes.load(a.tree, (id) => byId.get(id) || null); if (r && Panes.leaves(r).length === t.panes.length) t.root = r; } // else the even grid makeTab made
+    layout(t); switchTab(t);
+  };
+  // Last time's tabs: each pane's shell in its folder, its old scrollback dimmed above a rule.
+  function restoreTab(s) {
+    const cells = Panes.leaves(Panes.load(s.tree, (x) => x)); if (!cells.length) return;
+    const t = makeTab({ profile: cells[0].profile, cwd: cells[0].cwd, name: s.name, color: s.color });
+    for (const c of cells.slice(1)) makePane(t, null, null, { profile: c.profile, cwd: c.cwd });
+    const at = new Map(cells.map((c, i) => [c, t.panes[i]]));
+    t.root = Panes.load(s.tree, (c) => at.get(c) || null);
+    cells.forEach((c, i) => { if (c.text) t.panes[i].term.write(`\x1b[2m${c.text.replace(/\r?\n/g, '\r\n')}\x1b[0m\r\n\x1b[35m── restored session ──\x1b[0m\r\n`); });
+    layout(t); label(t);
+  }
+  // The session as it stands: every tab's tree, and the tail of each pane's scrollback. Main
+  // adds each pane's shell and folder. ponytail: the first window only; torn-off windows' tabs
+  // aren't kept.
+  const SCROLL_KEEP = 2000;
+  function scrollTail(p) {
+    const b = p.term.buffer.normal, lines = [];
+    for (let y = Math.max(0, b.length - SCROLL_KEEP); y < b.length; y++) lines.push(b.getLine(y).translateToString(true));
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    return lines.join('\n');
+  }
+  const saveSession = () => window.gibson.saveSession(tabs.map((t) => ({ name: t.opts.name, color: t.opts.color, tree: Panes.save(t.root, (p) => ({ id: p.id, text: scrollTail(p) })) })));
+  if (!B.shot && !B.adopt && !B.idBase) { setInterval(saveSession, 30000); addEventListener('beforeunload', saveSession); }
   window.gibson.onAdopt(adoptTab); // a tab dropped here from another window
   if (B.adopt) adoptTab(B.adopt); // a torn-off tab
+  else if (B.session && B.session.length && !B.shot) { for (const s of B.session) restoreTab(s); switchTab(tabs[0] || makeTab()); }
   else if (B.startTabs.length && !B.shot) { // the saved start tabs
     for (const s of B.startTabs) { const t = makeTab({ profile: s.profile, cwd: s.cwd, name: s.name, color: s.color }); if (s.panes > 1) { switchTab(t); setPanes(s.panes); } }
     switchTab(tabs[0]);
@@ -456,7 +641,7 @@
 
   // --- worlds + fx ------------------------------------------------------------
   worldEnv.fs = await window.gibson.listDir(focused.id);
-  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news, packets: cfg.packets !== false, ships: cfg.ships !== false, spec: jukeOn() ? juke.spectrum(specBuf) : music && music.on ? music.spectrum(specBuf) : null, dance: cfg.dance !== false, cmd: worldEnv.cmd, build: act.busyOut, song: jukeOn() ? juke.title : music && music.on ? music.styleName : '', home: B.shot ? [40.7, -74] : null }));
+  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news, packets: cfg.packets !== false, ships: cfg.ships !== false, spec: jukeOn() ? juke.spectrum(specBuf) : music && music.on ? music.spectrum(specBuf) : null, dance: cfg.dance !== false, calm: cfg.calm !== false, typing: act.keys, cmd: worldEnv.cmd, build: act.busyOut, song: jukeOn() ? juke.title : music && music.on ? music.styleName : '', home: B.shot ? [40.7, -74] : null }));
 
   const specBuf = new Float32Array(48); // the jukebox's spectrum, for the Milkdrop worlds
 
@@ -596,15 +781,46 @@
   }
   setInterval(monPoll, 1000);
   function toggleMon() { mon.on = !mon.on; $('sysmon').classList.toggle('off', !mon.on); window.gibson.save('sysmon', mon.on); if (mon.on) { procAt = 0; monPoll(); } }
+  // What the right-click menu and the palette show checked: the page's current state.
+  const menuState = () => ({
+      selection: !!focused.term.getSelection(), panes: tab.panes.length, zoomed: !!tab.zoom, broadcast: !!tab.broadcast, tabColor: tab.opts.color || '', tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
+      worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
+      irc: ircPanel.visible, leet: !!cfg.nyx.leet, music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
+      source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false, packets: cfg.packets !== false, dance: cfg.dance !== false, sysmon: mon.on, ships: cfg.ships !== false,
+      ...Object.fromEntries(Object.keys(EXTRAS).map((k) => [k, flag(k)])), calm: cfg.calm !== false,
+  });
+  // The command palette (renderer/palette.js): main flattens the menu (palette:list) and runs a pick.
+  function openPalette() {
+    const p = focused;
+    window.gibson.paletteList(menuState()).then((items) => Palette.open(items, { run: (it) => window.gibson.paletteRun(it.id), done: () => p && p.term.focus() }));
+  }
+  // Soft keys (renderer/keys.js SOFT: Alt+arrows, Ctrl+Up/Down...) are caught here, in xterm's key
+  // handler, not in main: they're taken from the shell only when action() acts on them and returns
+  // true; anything else goes to the shell as usual.
+  function softKey(p, e) { // hoisted: panes exist before this line runs
+    if (e.type !== 'keydown' || p !== focused) return true;
+    const a = Keys.keymap(cfg.keys)[Keys.fromInput(e)];
+    return !(a && Keys.SOFT.has(a) && action(a) === true);
+  }
   function action(a) {
     const t = focused.term;
     if (a === 'copy') navigator.clipboard.writeText(t.getSelection());
     else if (a === 'paste') { const p = focused; navigator.clipboard.readText().then((s) => pasteInto(p, s)); }
     else if (a === 'find') return openFind(focused);
+    else if (a === 'prompt:prev' || a === 'prompt:next') return ShellInt.jump(focused, a === 'prompt:prev' ? -1 : 1); // false: no marks, the key goes on to the shell
+    else if (a === 'output:copy') { const o = ShellInt.output(focused); if (o) navigator.clipboard.writeText(o.text); }
+    else if (a === 'output:save') window.gibson.saveOutput(ShellInt.all(focused));
+    else if (a === 'scrollback:clear') { focused.term.clear(); ShellInt.reset(focused); }
+    else if (a === 'search:all') return searchAll();
     else if (a.startsWith('font:')) setFont(a === 'font:up' ? cfg.fontSize + 1 : a === 'font:down' ? cfg.fontSize - 1 : B.defaults.fontSize);
     else if (a === 'broadcast') { if (tab.panes.length > 1) tab.broadcast = !tab.broadcast; tab.el.classList.toggle('broadcast', !!tab.broadcast); label(tab); }
     else if (a === 'zoompane') { if (tab.panes.length > 1) { tab.zoom = !tab.zoom; for (const x of tab.panes) x.el.classList.toggle('zoom', tab.zoom && x === focused); layout(tab); } }
-    else if (a === 'evenpanes') { tab.c = tab.r = 0.5; layout(tab); }
+    else if (a === 'evenpanes') { tab.root = Panes.even(tab.root); layout(tab); }
+    else if (a === 'split:right' || a === 'split:down') return splitPane(a === 'split:right' ? 'row' : 'col');
+    else if (a === 'closepane') return closePaneUI(focused);
+    // true only when something moved: softKey then swallows the key, else it reaches the shell
+    else if (a.startsWith('focus:')) { const q = Panes.neighbour(tab.root, focused, a.slice(6)); if (!q) return false; setFocus(q); q.term.focus(); return true; }
+    else if (a.startsWith('resize:')) { if (!Panes.nudge(tab.root, focused, a.slice(7), 0.04)) return false; layout(tab); return true; }
     else if (a.startsWith('tabcolor:')) { tab.opts = { ...tab.opts, color: a.slice(9) || undefined }; label(tab); }
     else if (a.startsWith('irc:mode:')) { ircPanel.destroy(); ircPanel = makeIrc(a.slice(9)); ircPanel.show(); window.gibson.save('ircOpen', ircPanel.visible); return ircPanel.focus(); }
     else if (a === 'irc') { ircPanel.toggle(); window.gibson.save('ircOpen', ircPanel.visible); if (ircPanel.visible) return ircPanel.focus(); }
@@ -619,8 +835,10 @@
     else if (a === 'synth') { $('synth').classList.toggle('off'); synthPaint(); }
     else if (a === 'logo') { setLogo(!cfg.logo); window.gibson.save('logo', cfg.logo); }
     else if (a === 'cigarette') { cfg.cigarette = cfg.cigarette === false; window.gibson.save('cigarette', cfg.cigarette); }
-    else if (Object.hasOwn(EXTRAS, a)) { cfg[a] = !flag(a); window.gibson.save(a, cfg[a]); applyLook(); }
+    else if (Object.hasOwn(EXTRAS, a)) { cfg[a] = !flag(a); window.gibson.save(a, cfg[a]); applyLook(); applyReadable(); }
     else if (a === 'sysmon') toggleMon();
+    else if (a === 'palette') return openPalette();
+    else if (a === 'calm') { cfg.calm = cfg.calm === false; window.gibson.save('calm', cfg.calm); }
     else if (a === 'dance') { cfg.dance = cfg.dance === false; window.gibson.save('dance', cfg.dance); }
     else if (a === 'nyxworlds') { cfg.nyxWorlds = cfg.nyxWorlds === false; window.gibson.save('nyxWorlds', cfg.nyxWorlds); }
     else if (a === 'tabs:save') { window.gibson.saveTabs(tabs.map((x) => ({ id: x.panes[0].id, panes: x.panes.length, name: x.opts.name, color: x.opts.color }))); nyx.ctx.say(`${tabs.length} tab${tabs.length > 1 ? 's' : ''} saved. They will be waiting next time.`, 'tender'); }
@@ -662,24 +880,25 @@
   addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const p = tab.panes.find((x) => x.el.contains(e.target)); if (p) p.term.focus();
-    window.gibson.menu({
-      selection: !!focused.term.getSelection(), panes: tab.panes.length, zoomed: !!tab.zoom, broadcast: !!tab.broadcast, tabColor: tab.opts.color || '', tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
-      worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
-      irc: ircPanel.visible, leet: !!cfg.nyx.leet, music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
-      source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false, packets: cfg.packets !== false, dance: cfg.dance !== false, sysmon: mon.on, ships: cfg.ships !== false,
-      ...Object.fromEntries(Object.keys(EXTRAS).map((k) => [k, flag(k)])),
-    });
+    if (p && flag('rclickpaste') && !e.shiftKey) { // right-click pastes (or copies a selection, PuTTY-style); Shift+right-click is the menu
+      const s = p.term.getSelection();
+      if (s && !flag('copyselect')) { navigator.clipboard.writeText(s); p.term.clearSelection(); } else navigator.clipboard.readText().then((x) => pasteInto(p, x));
+      return;
+    }
+    window.gibson.menu(menuState());
   });
 
   // --- the loop ---------------------------------------------------------------
   // A command is done when the output has gone quiet and the cursor sits at an empty prompt.
-  // ponytail: prompt-shape heuristic, like typedLine; OSC 133 would be exact.
+  // With shell integration, exactly when the shell says so (OSC 133 D).
+  // ponytail: without it, a prompt-shape heuristic, like typedLine.
   let doneCheck = 0;
+  const atPrompt = (p) => { const line = typedLine(p); return line !== null && !line.trim(); };
   function finishedCommands() {
     const now = Date.now(), after = (cfg.notifyAfterSec ?? 10) * 1000;
     for (const p of allPanes()) {
       if (!p.cmdAt || now - p.lastOut < 1200) continue;
-      const line = typedLine(p); if (line === null || line.trim()) continue;
+      if (ShellInt.live(p) ? ShellInt.busy(p) : !atPrompt(p)) continue;
       const took = now - p.cmdAt; p.cmdAt = 0;
       if (!after || took < after || (document.hasFocus() && p.tab === tab)) continue; // you saw it finish
       const secs = Math.round(took / 1000), dur = secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`;

@@ -37,6 +37,24 @@ assert.equal(sysinfo.parseNetIO('', 'win32'), null, 'no counters');
   assert.ok(A.isAnagram('HACK THE PLANET', A.scramble('HACK THE PLANET')), 'a scrambled command is still its anagram');
 }
 
+// --- panes: the split tree behind free-form panes ---
+{
+  const P = require('../renderer/panes.js');
+  let r = P.split(P.split(P.leaf(1), 1, 2, 'row'), 2, 3, 'col'); // 1 | 2 over 3
+  assert.deepEqual(P.leaves(r), [1, 2, 3], 'split right, then down');
+  assert.equal(P.neighbour(r, 1, 'right'), 2); assert.equal(P.neighbour(r, 3, 'up'), 2); assert.equal(P.neighbour(r, 3, 'left'), 1); assert.equal(P.neighbour(r, 1, 'left'), null, 'nothing past the edge');
+  assert.deepEqual(P.leaves(P.split(r, 3, 4, 'row', true)), [1, 2, 4, 3], 'dock before');
+  assert.deepEqual(P.leaves(P.swap(r, 1, 3)), [3, 2, 1], 'swap');
+  const gone = P.remove(r, 2); assert.deepEqual(P.leaves(gone), [1, 3], 'close: the sibling takes the space'); assert.equal(gone.dir, 'row');
+  assert.equal(P.remove(P.leaf(1), 1), null, 'the last pane');
+  for (const n of [1, 2, 3, 5, 7, 16]) { const g = P.rects(P.grid([...Array(n).keys()])).panes; assert.equal(g.length, n, `grid of ${n}`); assert.ok(Math.abs(g.reduce((a, x) => a + x.w * x.h, 0) - 1) < 1e-9, `grid of ${n} fills the tab`); }
+  assert.ok(P.rects(P.grid([...Array(16).keys()])).panes.every((x) => Math.abs(x.w - 0.25) < 1e-9 && Math.abs(x.h - 0.25) < 1e-9), '16 is 4x4');
+  const three = P.even(P.split(P.split(P.leaf(1), 1, 2, 'row'), 2, 3, 'row'));
+  assert.ok(P.rects(three).panes.every((x) => Math.abs(x.w - 1 / 3) < 1e-9), 'even out: three across');
+  assert.ok(P.nudge(three, 3, 'left', 0.05) && !P.nudge(three, 3, 'up', 0.05), 'nudge finds a gap of the right kind');
+  assert.deepEqual(P.leaves(P.load(P.save(P.grid([1, 2, 3, 4]), (p) => ({ id: p })), (o) => (o.id % 2 ? o.id : null))), [1, 3], 'save and load; a pane that is gone drops out');
+}
+
 // --- NIGHT SKY: the sums against known positions ---
 {
   const S = Worlds.sky, t = (s) => Date.parse(s), near = (a, b, tol, what) => assert.ok(Math.abs(a - b) <= tol, `${what}: ${a.toFixed(2)} vs ${b}`);
@@ -46,6 +64,91 @@ assert.equal(sysinfo.parseNetIO('', 'win32'), null, 'no counters');
   near(S.planetRaDec('mars', t('2025-01-16T00:00:00Z'))[1], 25, 2, 'Mars at its 2025 opposition');
   near(S.sep(S.sunRaDec(t('2024-04-08T18:18:00Z')), S.moonRaDec(t('2024-04-08T18:18:00Z'))), 0, 2, 'Moon on the Sun at the 2024 eclipse');
   near(S.altAz(37.95, 89.264, 34, -118, Date.now())[0], 34, 1.2, 'Polaris stands at your latitude');
+}
+
+// --- dropped files, quoted for each shell; search across scrollback ---
+{
+  const K = require('../renderer/termkit.js');
+  assert.equal(K.shellKind('PowerShell 7'), 'pwsh'); assert.equal(K.shellKind('cmd'), 'cmd'); assert.equal(K.shellKind('Ubuntu (WSL)'), 'wsl');
+  assert.equal(K.shellKind('Git Bash'), 'posix'); assert.equal(K.shellKind('', 'win32'), 'pwsh'); assert.equal(K.shellKind('', 'linux'), 'posix');
+  assert.equal(K.quotePaths(["C:\\it's mine\\a b.txt", 'C:\\x'], 'pwsh'), "'C:\\it''s mine\\a b.txt' 'C:\\x'", 'PowerShell doubles single quotes');
+  assert.equal(K.quotePaths(['C:\\a b\\c.txt'], 'cmd'), '"C:\\a b\\c.txt"');
+  assert.equal(K.quotePaths(["/home/me/it's"], 'posix'), "'/home/me/it'\\''s'", "POSIX: close, escaped quote, reopen");
+  assert.equal(K.quotePaths(['D:\\Proj\\x y.js'], 'wsl'), "'/mnt/d/Proj/x y.js'", 'WSL sees the drive under /mnt');
+  const L = ['error: one ERROR', 'fine', 'x.y and xay'];
+  assert.deepEqual(K.findAll(L, 'error').map((m) => [m.row, m.start]), [[0, 0], [0, 11]], 'case-insensitive by default');
+  assert.equal(K.findAll(L, 'error', { caseSensitive: true }).length, 1, 'case-sensitive');
+  assert.equal(K.findAll(L, 'x.y').length, 1, 'plain text: the dot is a dot');
+  assert.equal(K.findAll(L, 'x.y', { regex: true }).length, 2, 'regex: the dot is anything');
+  assert.deepEqual(K.findAll(L, '(', { regex: true }), [], 'a broken regex finds nothing, no throw');
+  assert.equal(K.findAll(Array(100).fill('aaaa'), 'a', { max: 7 }).length, 7, 'capped');
+  assert.equal(K.findAll(['abc'], '^', { regex: true }).length, 0, 'empty matches skipped, no endless loop');
+}
+
+// --- keys: accelerators, key presses and the user's overrides ---
+{
+  const K = require('../renderer/keys.js');
+  assert.equal(K.norm('shift+ctrl+t'), 'Ctrl+Shift+T', 'modifiers in order, key uppercased');
+  assert.equal(K.norm('CmdOrCtrl+Shift+space'), 'Ctrl+Shift+Space');
+  assert.equal(K.norm('Ctrl++'), 'Ctrl+=', 'the + key is the = key');
+  assert.equal(K.fromInput({ key: '+', code: 'Equal', alt: true, shift: true }), 'Alt+Shift+=', 'Alt+Shift+= reads the key position, not the shifted +');
+  assert.equal(K.fromInput({ key: '!', code: 'Digit1', control: true, shift: true }), 'Ctrl+Shift+1');
+  assert.equal(K.fromInput({ key: 'ArrowUp', code: 'ArrowUp', ctrlKey: true }), 'Ctrl+Up', 'a DOM key event works too');
+  const m = K.keymap({ newtab: 'Ctrl+Alt+T', world: null, irc: ['F2', 'F3'] });
+  assert.equal(m['Ctrl+Alt+T'], 'newtab'); assert.equal(m['Ctrl+Shift+T'], undefined, 'an override replaces the default key');
+  assert.equal(m['Ctrl+Shift+W'], undefined, 'null unbinds'); assert.equal(m.F3, 'irc', 'a list binds several keys');
+  assert.equal(m['Alt+Shift+='], 'split:right'); assert.equal(K.keyOf(m, 'palette'), 'Ctrl+Shift+Space');
+  assert.equal(Object.keys(K.keymap()).length, Object.values(K.DEFAULT_KEYS).flat().filter(Boolean).length, 'no two default actions share a key');
+}
+// --- ssh hosts from ~/.ssh/config ---
+{
+  const { parseSshConfig, sshProfile } = require('../ssh.js');
+  const h = parseSshConfig('Host *\n  User all\nHost box gw\n  HostName 10.0.0.2\n  User me\n  Port 2222\n# Host old\nHost pi?\nMatch host x\n  User nope\nHost web\n  HostName=web.example\n');
+  assert.deepEqual(h.map((x) => [x.name, x.host, x.user, x.port]), [['box', '10.0.0.2', 'me', 2222], ['gw', '10.0.0.2', 'me', 2222], ['web', 'web.example', undefined, undefined]], 'concrete hosts only, settings to every alias, Match ends a block');
+  assert.deepEqual(sshProfile(h[0]).args, ['box'], 'a config host opens by its alias');
+  assert.deepEqual(sshProfile({ name: 'x', host: 'h.example', user: 'u', port: 22 }).args, ['-p', '22', 'u@h.example']);
+}
+// --- the palette's fuzzy match ---
+{
+  const { fuzzy } = require('../renderer/palette.js');
+  assert.equal(fuzzy('xyz', 'World › Arcade › TRENCH RUN'), null);
+  assert.deepEqual(fuzzy('tr run', 'TRENCH RUN').hits, [0, 1, 7, 8, 9], 'spaces are free; letters found in order');
+  assert.ok(fuzzy('trench', 'World › Arcade › TRENCH RUN').score > fuzzy('trench', 'Look › Matrix rain on the bench').score, 'a word start beats scattered letters');
+}
+
+// --- shell integration: OSC 133 marks into commands, exit codes and output ---
+{
+  const SI = require('../renderer/shellint.js');
+  assert.deepEqual(SI.mark('D;2'), { kind: 'D', code: 2 }); assert.deepEqual(SI.mark('D'), { kind: 'D', code: null }); assert.equal(SI.mark('P;Cwd=x'), null);
+  assert.equal(SI.cwdOf(7, 'file://box/home/me/my%20dir'), '/home/me/my dir'); assert.equal(SI.cwdOf(7, 'file:///C:/Users/me'), 'C:/Users/me');
+  assert.equal(SI.cwdOf(9, '9;"C:\\Users\\me"'), 'C:\\Users\\me'); assert.equal(SI.cwdOf(9, '4;1;50'), null, 'OSC 9;4 is progress, not a folder');
+  // A terminal just big enough: rows of text, a cursor, markers on the cursor's row, OSC handlers.
+  const pane = () => {
+    const rows = [''], h = {}, b = { cursorX: 0, cursorY: 0, baseY: 0, viewportY: 0, get length() { return rows.length; },
+      getLine: (r) => (r < rows.length ? { isWrapped: false, translateToString: (trim, s = 0, e) => { const x = rows[r].slice(s, e); return trim ? x.trimEnd() : x; } } : undefined) };
+    const term = { buffer: { active: b }, parser: { registerOscHandler: (n, f) => { h[n] = f; } }, hasSelection: () => false,
+      registerMarker: () => ({ line: b.cursorY, isDisposed: false, dispose() { this.isDisposed = true; } }),
+      write(s) {
+        for (const m of s.matchAll(/\x1b\](\d+);([^\x07]*)\x07|\n|[^\x1b\n]+/g)) {
+          if (m[1]) h[m[1]](m[2]);
+          else if (m[0] === '\n') { rows.push(''); b.cursorY++; b.cursorX = 0; }
+          else { rows[b.cursorY] += m[0]; b.cursorX += m[0].length; }
+        }
+      } };
+    const p = { term, done: [], dirs: [] }; SI.attach(p, { cwd: (_p, d) => p.dirs.push(d), done: (_p, r) => p.done.push([r.cmd, r.code]) });
+    return p;
+  };
+  const prompt = (code) => `\x1b]133;D${code === undefined ? '' : ';' + code}\x07\x1b]9;9;"C:\\x"\x07\x1b]133;A\x07PS C:\\x> \x1b]133;B\x07`;
+  const ps = pane(); ps.term.write(prompt(0));
+  assert.equal(SI.live(ps), true); assert.deepEqual(ps.dirs, ['C:\\x']); assert.deepEqual(ps.done, [], 'the first prompt ends nothing');
+  ps.term.write('git status'); assert.equal(SI.typed(ps), 'git status', 'typed: from the end of the prompt');
+  ps.term.write('\n\x1b]133;C\x07out1\nout2\n'); assert.equal(SI.busy(ps), true);
+  ps.term.write(prompt(1)); assert.deepEqual(ps.done, [['git status', 1]]); assert.equal(SI.busy(ps), false);
+  assert.equal(SI.output(ps).text, 'out1\nout2', 'output: between C and the next prompt');
+  ps.term.write('\n\x1b]133;C\x07' + prompt(0)); ps.term.write('half typed' + prompt(130));
+  assert.equal(ps.done.length, 1, 'an empty Enter, or Ctrl+C on a half-typed line, is no command');
+  const cmd = pane(); cmd.term.write(prompt()); cmd.term.write('dir\nfile.txt\n' + prompt()); // cmd.exe: no C, no exit code
+  assert.deepEqual(cmd.done, [['dir', null]]); assert.equal(SI.output(cmd).text, 'file.txt');
 }
 
 // --- the jukebox knows a tracker module from a recording ---

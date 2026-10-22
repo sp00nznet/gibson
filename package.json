@@ -1,6 +1,6 @@
 {
   "name": "gibson",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "GIBSON: a cracktro terminal. Wireframe worlds, reactive techno, and NYX, the unseen sysop who watches you type.",
   "author": "sp00nznet",
   "license": "MIT",
@@ -40,7 +40,9 @@
       "main.js",
       "llm.js",
       "sysinfo.js",
+      "ssh.js",
       "bbs/**",
+      "shell/**",
       "irc.js",
       "sync.js",
       "agent.js",
@@ -55,7 +57,8 @@
       "node_modules/node-pty/**",
       "node_modules/node-llama-cpp/**",
       "node_modules/@node-llama-cpp/**",
-      "bbs/**"
+      "bbs/**",
+      "shell/**"
     ],
     "npmRebuild": false,
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",

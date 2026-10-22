@@ -1,7 +1,8 @@
 // The only doorway between the page and the machine. Keep it this small.
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('gibson', {
+  pathOf: (file) => webUtils.getPathForFile(file), // a file dropped on a pane (File.path is gone)
   boot: () => ipcRenderer.invoke('boot'),
   open: (id, opts) => ipcRenderer.send('pty:open', id, opts),
   adopt: (id) => ipcRenderer.invoke('pty:adopt', id),
@@ -11,6 +12,8 @@ contextBridge.exposeInMainWorld('gibson', {
   write: (id, d) => ipcRenderer.send('pty:write', id, d),
   resize: (id, c, r) => ipcRenderer.send('pty:resize', id, c, r),
   line: (id, l) => ipcRenderer.send('pty:line', id, l),
+  cwd: (id, dir) => ipcRenderer.send('pty:cwd', id, dir),
+  saveOutput: (text) => ipcRenderer.invoke('output:save', text),
   onData: (fn) => ipcRenderer.on('pty:data', (_e, id, d) => fn(id, d)),
   listDir: (id) => ipcRenderer.invoke('fs:list', id),
   gitLog: (id) => ipcRenderer.invoke('git:log', id),
@@ -21,6 +24,8 @@ contextBridge.exposeInMainWorld('gibson', {
   onNews: (fn) => ipcRenderer.on('news', (_e, items) => fn(items)),
   onHotkey: (fn) => ipcRenderer.on('hotkey', (_e, a) => fn(a)),
   menu: (state) => ipcRenderer.send('menu', state),
+  paletteList: (state) => ipcRenderer.invoke('palette:list', state),
+  paletteRun: (id) => ipcRenderer.send('palette:run', id),
   shellMenu: () => ipcRenderer.send('menu:shells'),
   readFile: (id, file) => ipcRenderer.invoke('fs:read', id, file),
   irc: { // the IRC lobby's real mode (irc.js); fake mode needs none of this
@@ -31,6 +36,7 @@ contextBridge.exposeInMainWorld('gibson', {
   linkCheck: (id, files) => ipcRenderer.invoke('link:check', id, files),
   linkOpen: (id, file, line, col) => ipcRenderer.send('link:open', id, file, line, col),
   saveTabs: (list) => ipcRenderer.send('tabs:save', list),
+  saveSession: (list) => ipcRenderer.send('session:save', list),
   musicList: () => ipcRenderer.invoke('music:list'),
   musicPick: () => ipcRenderer.invoke('music:pick'),
   save: (key, v) => ipcRenderer.send('cfg:save', key, v),
