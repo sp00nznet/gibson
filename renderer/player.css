@@ -30,3 +30,40 @@
 #player button:active { border-color: #08100c #4f6a5d #4f6a5d #08100c; }
 #player button:hover, #player button.lit { color: #fff; text-shadow: 0 0 5px #ff2e88; }
 #player button.lit { background: linear-gradient(#4a1030, #1a0412); }
+
+/* The synth panel (right-click > Music > Synth panel, ctrl+shift+K): same box as the player. */
+#synth { position: fixed; left: 16px; bottom: 12px; z-index: 6; width: 300px; box-sizing: border-box; background: linear-gradient(#1a0826, #0a0010); border: 1px solid #ff2e88;
+  box-shadow: 0 0 14px rgba(255, 46, 136, 0.35); font: 10px 'Cascadia Mono', Consolas, monospace; color: #8bffc4; opacity: 0.8; transition: opacity 0.3s; user-select: none; }
+#synth:hover { opacity: 1; }
+#synth.off { display: none; }
+#synth .bar { height: 13px; line-height: 13px; text-align: center; font-size: 9px; letter-spacing: 2px; color: #ffd6ec; background: #2a0a36; text-shadow: 0 0 4px #ff2e88; }
+#synth .now { margin: 4px 5px; padding: 2px 4px; background: #020a06; border: 1px solid #0f3a26; color: #39ff9c; text-shadow: 0 0 5px #39ff9c; white-space: nowrap; overflow: hidden; }
+#synth .knobs { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; padding: 0 5px 4px; }
+#synth label { display: flex; flex-direction: column; letter-spacing: 1px; }
+#synth input[type=range] { accent-color: #ff2e88; width: 100%; margin: 1px 0; }
+#synth .row { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 5px 4px; }
+#synth button { font: bold 9px 'Cascadia Mono', Consolas, monospace; color: #8bffc4; cursor: pointer; padding: 2px 3px; flex: 1;
+  background: linear-gradient(#2a3a33, #0c1611); border: 1px solid; border-color: #4f6a5d #08100c #08100c #4f6a5d; }
+#synth button:active { border-color: #08100c #4f6a5d #4f6a5d #08100c; }
+#synth button:hover, #synth button.lit { color: #fff; text-shadow: 0 0 5px #ff2e88; }
+#synth button.lit { background: linear-gradient(#4a1030, #1a0412); }
+#synth.juke .syn, #synth:not(.juke) .juke { display: none; }
+
+/* The system monitor (right-click > Look > System monitor, ctrl+shift+G): same box, top right. */
+#sysmon { position: fixed; right: 16px; top: 12px; z-index: 6; width: 280px; box-sizing: border-box; background: linear-gradient(#1a0826, #0a0010); border: 1px solid #ff2e88;
+  box-shadow: 0 0 14px rgba(255, 46, 136, 0.35); font: 10px 'Cascadia Mono', Consolas, monospace; color: #8bffc4; opacity: 0.8; transition: opacity 0.3s; user-select: none; }
+#sysmon:hover { opacity: 1; }
+#sysmon.off { display: none; }
+#sysmon .bar { height: 13px; line-height: 13px; text-align: center; font-size: 9px; letter-spacing: 2px; color: #ffd6ec; background: #2a0a36; text-shadow: 0 0 4px #ff2e88; }
+#sm-graph { display: block; width: 268px; height: 44px; margin: 4px 5px 2px; background: #020a06; border: 1px solid #0f3a26; box-sizing: border-box; }
+#sm-rows, #sm-procs { padding: 2px 6px 4px; }
+#sysmon .row { display: grid; grid-template-columns: 34px 1fr 92px; gap: 6px; align-items: center; height: 14px; white-space: nowrap; }
+#sysmon .meter { height: 6px; background: #0b1f16; border: 1px solid #0f3a26; }
+#sysmon .meter i { display: block; height: 100%; background: #39ff9c; box-shadow: 0 0 5px #39ff9c; }
+#sysmon .meter i.hot { background: #ff2e88; box-shadow: 0 0 5px #ff2e88; }
+#sysmon .v { text-align: right; color: #ffd6ec; }
+#sm-procs { border-top: 1px solid #3a0f4a; }
+#sm-procs .p { display: grid; grid-template-columns: 1fr 44px 56px; gap: 4px; height: 13px; white-space: nowrap; overflow: hidden; }
+#sm-procs .p span:first-child { overflow: hidden; text-overflow: ellipsis; }
+#sm-procs .p span:not(:first-child) { text-align: right; color: #ffd6ec; }
+#sm-procs .h { color: #ff2e88; letter-spacing: 1px; }

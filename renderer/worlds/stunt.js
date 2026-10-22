@@ -59,9 +59,14 @@
     }
     const wrap = (s) => ((s % LEN) + LEN) % LEN;
     const at = (s) => pts[Math.floor(wrap(s) / DS) % n];
-    function posAt(s, lane, out) {
-      const w = wrap(s), i = Math.floor(w / DS) % n, f = w / DS - Math.floor(w / DS), a = pts[i], b = pts[(i + 1) % n];
-      for (let c = 0; c < 3; c++) out[c] = a.P[c] + (b.P[c] - a.P[c]) * f + a.R[c] * lane;
+    const mix = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+    // A point on the road, s along it and lane across. With fr, also the road's frame there (T, U, R),
+    // blended between the two samples either side: taken from one sample, a car's heading and bank
+    // jumped every 3 m, and its lane offset with them.
+    function posAt(s, lane, out, fr) {
+      const w = wrap(s), i = Math.floor(w / DS) % n, f = w / DS - Math.floor(w / DS), a = pts[i], b = pts[(i + 1) % n], R = mix(a.R, b.R, f);
+      for (let c = 0; c < 3; c++) out[c] = a.P[c] + (b.P[c] - a.P[c]) * f + R[c] * lane;
+      if (fr) { fr.T = V3.norm(mix(a.T, b.T, f)); fr.R = V3.norm(R); fr.U = V3.cross(fr.T, fr.R); }
       return out;
     }
 
@@ -87,6 +92,7 @@
     function burst(p, nSp, pow) { for (let i = 0; i < nSp; i++) sparks.push({ p: p.slice(), v: [rand(-pow, pow), rand(1, pow), rand(-pow, pow)], t: rand(0.4, 1.2) }); }
     function land(c, fr, hs) {
       const slope = fr.T[1] / Math.hypot(fr.T[0], fr.T[2]), impact = Math.max(0, slope * hs - c.vel[1]);
+      const q = posAt(c.s, c.lane, [0, 0, 0]); c.off = V3.sub(c.p, q); // where it came down vs. its lane: eased out, not snapped (it was up to 1 m)
       c.mode = 'track'; c.v = hs; c.lt = 0;
       if (impact > 5 || c.hard) {
         c.dmg = Math.min(100, c.dmg + Math.max(0, impact - 7.5) * 3 + (c.hard ? 10 : 0)); c.v *= 0.85; burst(c.p, Math.min(40, 8 + impact * 3) | 0, 6);
@@ -94,6 +100,7 @@
       }
       c.hard = false;
     }
+    const road = {};
     function drive(c, dt) {
       if (c.done) { c.v *= 1 - dt * 0.5; c.s = wrap(c.s + c.v * dt); return; }
       c.lapT += dt;
@@ -109,7 +116,12 @@
         const nf = at(c.s);
         c.lt += dt;
         if (nf.gap || (c.lt > 0.4 && nf.hpp * c.v * c.v < -GR)) { c.mode = 'air'; c.vel = [fr.T[0] * c.v, fr.T[1] * c.v, fr.T[2] * c.v]; } // the road drops away
-        else { posAt(c.s, c.lane, c.p); c.T = nf.T; c.U = nf.U; c.R = nf.R; }
+        else {
+          posAt(c.s, c.lane, c.p, road);
+          if (c.off) { const e = Math.exp(-dt * 6); for (let i = 0; i < 3; i++) { c.off[i] *= e; c.p[i] += c.off[i]; } if (Math.abs(c.off[0]) + Math.abs(c.off[2]) < 0.01) c.off = null; }
+          const e = Math.min(1, dt * 12); // eases the nose down onto the road after a landing; on the road it just follows
+          c.T = V3.norm(mix(c.T, road.T, e)); c.R = V3.norm(mix(c.R, road.R, e)); c.U = V3.cross(c.T, c.R);
+        }
       } else if (c.mode === 'air' || c.mode === 'fall') {
         c.vel[1] -= GR * dt; for (let i = 0; i < 3; i++) c.p[i] += c.vel[i] * dt;
         c.T = V3.norm(V3.add(c.T, V3.norm(c.vel), dt * 1.5)); c.R = V3.norm([c.T[2], 0, -c.T[0]]); c.U = V3.cross(c.T, c.R);
@@ -121,7 +133,7 @@
         else if (!nf.gap && c.p[1] <= deck) { c.p[1] = deck; land(c, nf, hs); }
       } else if (c.mode === 'crane') {
         c.crane += dt;
-        if (c.crane > 6) { c.mode = 'track'; c.s = GAP_B + 12; c.v = 3; c.spin = 0; return; }
+        if (c.crane > 6) { c.mode = 'track'; c.s = GAP_B + 12; c.v = 3; c.spin = 0; c.off = null; return; }
         else if (c.crane > 1.5) { // up, over, and down onto the landing deck
           const u = Math.min(1, (c.crane - 1.5) / 4), e = u * u * (3 - 2 * u), to = posAt(GAP_B + 12, c.lane, [0, 0, 0]);
           c.p = [c.from[0] + (to[0] - c.from[0]) * e, c.from[1] + (to[1] + 6 - c.from[1]) * e - (c.crane > 5.5 ? (c.crane - 5.5) * 12 : 0), c.from[2] + (to[2] - c.from[2]) * e];
@@ -155,7 +167,7 @@
         for (const f of feed) f.t -= dt;
         for (const s of sparks) { s.v[1] -= GR * dt; for (let i = 0; i < 3; i++) s.p[i] += s.v[i] * dt; s.t -= dt; }
         sparks = sparks.filter((s) => s.t > 0);
-        if (state === 'grid') { cars.forEach((c) => { posAt(c.s, c.lane, c.p); const f = at(c.s); c.T = f.T; c.U = f.U; c.R = f.R; }); if (stateT > 3) { state = 'race'; stateT = 0; say('GO', C.neon); } return; }
+        if (state === 'grid') { cars.forEach((c) => { posAt(c.s, c.lane, c.p, c); c.off = null; }); if (stateT > 3) { state = 'race'; stateT = 0; say('GO', C.neon); } return; }
         const sp = 1 + env.level * 0.3;
         for (const c of cars) { const was = c.s; drive(c, dt * sp); if (!c.done) lapCheck(c, was); }
         if (state === 'race' && (me.done || me.dmg >= 100)) {

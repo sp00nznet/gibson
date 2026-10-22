@@ -24,6 +24,30 @@ assert.deepEqual(sysinfo.parseFeed(rss).map((i) => [i.title, i.source]), [['Worm
 const atom = '<feed><title>Reg</title><entry><title type="html">Patch &#8217;em</title><link href="https://y/2"/></entry></feed>';
 assert.deepEqual(sysinfo.parseFeed(atom)[0], { title: 'Patch \u2019em', link: 'https://y/2', source: 'Reg' }, 'Atom');
 
+// --- system monitor: network byte counters on each platform ---
+assert.deepEqual(sysinfo.parseNetIO('Interface Statistics\n\n                           Received            Sent\n\nBytes                    1772932204      3221589704\nUnicast packets           640974360       649963421\n', 'win32'), [1772932204, 3221589704], 'netstat -e');
+assert.deepEqual(sysinfo.parseNetIO('Inter-|   Receive  |  Transmit\n face |bytes packets errs drop fifo frame compressed multicast|bytes packets\n    lo: 500 5 0 0 0 0 0 0 500 5 0 0 0 0 0 0\n  eth0: 1000 10 0 0 0 0 0 0 2000 20 0 0 0 0 0 0\n wlan0: 30 1 0 0 0 0 0 0 40 1 0 0 0 0 0 0\n', 'linux'), [1030, 2040], '/proc/net/dev, lo skipped');
+assert.deepEqual(sysinfo.parseNetIO('Name  Mtu   Network       Address            Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll\nlo0   16384 <Link#1>                        100     0      9000      100     0      9000     0\nen0   1500  <Link#4>    a4:83:e7:00:00:01  5000     0    700000     4000     0    300000     0\nen0   1500  192.168.1     192.168.1.5        4000     -    600000     3000     -    200000     -\nutun0 1380  <Link#9>                         10     0       100       12     0       200     0\n', 'darwin'), [700100, 300200], 'netstat -ib: Link rows only, blank Address');
+assert.equal(sysinfo.parseNetIO('', 'win32'), null, 'no counters');
+
+// --- SNEAKERS: every puzzle really is an anagram, and every letter finds a partner ---
+{
+  const A = Worlds.anagrams;
+  for (const [a, b] of A.PAIRS) { assert.ok(A.isAnagram(a, b), `${a} / ${b}`); assert.ok(!A.pairUp(a, b).some((i, j) => i < 0 && /[A-Z0-9]/.test(b[j])), `${a} -> ${b} maps every letter`); }
+  assert.ok(A.isAnagram('HACK THE PLANET', A.scramble('HACK THE PLANET')), 'a scrambled command is still its anagram');
+}
+
+// --- NIGHT SKY: the sums against known positions ---
+{
+  const S = Worlds.sky, t = (s) => Date.parse(s), near = (a, b, tol, what) => assert.ok(Math.abs(a - b) <= tol, `${what}: ${a.toFixed(2)} vs ${b}`);
+  near(S.gmst(t('2000-01-01T12:00:00Z')), 280.461, 0.01, 'sidereal time at J2000');
+  const sun = S.sunRaDec(t('2000-01-01T12:00:00Z')); near(sun[0], 281.29, 0.3, 'Sun RA at J2000'); near(sun[1], -23.03, 0.3, 'Sun Dec at J2000');
+  near(S.sunRaDec(t('2024-06-20T20:51:00Z'))[1], 23.44, 0.2, 'Sun at the 2024 June solstice');
+  near(S.planetRaDec('mars', t('2025-01-16T00:00:00Z'))[1], 25, 2, 'Mars at its 2025 opposition');
+  near(S.sep(S.sunRaDec(t('2024-04-08T18:18:00Z')), S.moonRaDec(t('2024-04-08T18:18:00Z'))), 0, 2, 'Moon on the Sun at the 2024 eclipse');
+  near(S.altAz(37.95, 89.264, 34, -118, Date.now())[0], 34, 1.2, 'Polaris stands at your latitude');
+}
+
 // --- the jukebox knows a tracker module from a recording ---
 const { Jukebox } = require('../renderer/jukebox.js');
 for (const f of ['a.mod', 'b/C.XM', 'x.s3m', 'y.it', 'z.mptm']) assert.ok(Jukebox.isTracker(f), f);

@@ -121,4 +121,44 @@ function unixShells(etcShells, current, mac, exists) {
   return out;
 }
 
-module.exports = { parseNet, netConns, parseProcs, procs, parseFeed, fetchFeeds, wslDistros, unixShells, SERVICES };
+// --- SYSTEM MONITOR ------------------------------------------------------------------------
+// CPU from os.cpus() deltas, memory from os, disks from statfs, network bytes from the platform's
+// counters (netstat -e on Windows, /proc/net/dev on Linux, netstat -ib on macOS) turned into
+// rates between polls.
+const os = require('os'), fs = require('fs');
+// Total [received, sent] bytes from each platform's counter output, or null.
+function parseNetIO(out, plat) {
+  if (plat === 'win32') { const m = /^Bytes\s+(\d+)\s+(\d+)/m.exec(out); return m ? [Number(m[1]), Number(m[2])] : null; }
+  let rx = 0, tx = 0, seen = false;
+  for (const line of out.split('\n')) {
+    if (plat === 'linux') {
+      const i = line.indexOf(':'); if (i < 0) continue;
+      const name = line.slice(0, i).trim(), f = line.slice(i + 1).trim().split(/\s+/).map(Number);
+      if (name === 'lo' || f.length < 9) continue; rx += f[0]; tx += f[8]; seen = true;
+    } else { // macOS: one <Link#n> row per interface; the counters are the last columns (Address may be blank)
+      const f = line.trim().split(/\s+/), n = f.length;
+      if (!/^<Link#/.test(f[2] || '') || /^lo/.test(f[0]) || n < 10) continue; rx += Number(f[n - 5]) || 0; tx += Number(f[n - 2]) || 0; seen = true;
+    }
+  }
+  return seen ? [rx, tx] : null;
+}
+let lastTimes = null, lastIO = null, roots = null, rootsAt = 0;
+async function stats() {
+  const t = os.cpus().reduce((a, c) => { const v = c.times; a.idle += v.idle; a.all += v.user + v.nice + v.sys + v.idle + v.irq; return a; }, { idle: 0, all: 0 });
+  const cpu = lastTimes && t.all > lastTimes.all ? 100 * (1 - (t.idle - lastTimes.idle) / (t.all - lastTimes.all)) : 0; lastTimes = t;
+  if (!roots || Date.now() - rootsAt > 60000) { // drive letters come and go; look again each minute
+    rootsAt = Date.now();
+    roots = process.platform === 'win32' ? 'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((l) => l + ':\\').filter((r) => fs.existsSync(r)) : ['/'];
+  }
+  const late = new Promise((r) => setTimeout(r, 2000, null)); // a dead network drive must not stall the panel
+  const disks = (await Promise.all(roots.map((r) => Promise.race([fs.promises.statfs(r).catch(() => null), late]))))
+    .map((s, i) => s && s.blocks && { name: roots[i].replace(/\\$/, ''), total: s.blocks * s.bsize, free: s.bavail * s.bsize }).filter(Boolean);
+  const plat = process.platform, out = plat === 'win32' ? await run('netstat', ['-e']) : plat === 'linux' ? await fs.promises.readFile('/proc/net/dev', 'utf8').catch(() => '') : await run('netstat', ['-ibn']);
+  const io = parseNetIO(out, plat), now = Date.now();
+  let net = { rx: 0, tx: 0 };
+  if (io && lastIO && now > lastIO.at) { const dt = (now - lastIO.at) / 1000; net = { rx: Math.max(0, (io[0] - lastIO.io[0]) / dt), tx: Math.max(0, (io[1] - lastIO.io[1]) / dt) }; }
+  if (io) lastIO = { io, at: now };
+  return { cpu, cores: os.cpus().length, mem: { total: os.totalmem(), free: os.freemem() }, disks, net, up: os.uptime() };
+}
+
+module.exports = { parseNetIO, stats, parseNet, netConns, parseProcs, procs, parseFeed, fetchFeeds, wslDistros, unixShells, SERVICES };

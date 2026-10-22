@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('gibson', {
   gitLog: (id) => ipcRenderer.invoke('git:log', id),
   net: () => ipcRenderer.invoke('sys:net'),
   procs: () => ipcRenderer.invoke('sys:procs'),
+  stats: () => ipcRenderer.invoke('sys:stats'),
+  hw: () => ipcRenderer.invoke('sys:hw'),
   onNews: (fn) => ipcRenderer.on('news', (_e, items) => fn(items)),
   onHotkey: (fn) => ipcRenderer.on('hotkey', (_e, a) => fn(a)),
   menu: (state) => ipcRenderer.send('menu', state),

@@ -35,7 +35,8 @@
     const src = this.ctx.createMediaElementSource(this.audio);
     this.an = this.ctx.createAnalyser(); this.an.fftSize = 512; this.an.smoothingTimeConstant = 0.15; this.bins = new Uint8Array(this.an.frequencyBinCount); // low smoothing: the default flattens kicks away
     this.gain = this.ctx.createGain(); this.gain.gain.value = this.vol;
-    src.connect(this.an); this.an.connect(this.gain).connect(this.ctx.destination); // beat detection before the volume
+    this.rack = new Rack(this.ctx); Rack.all.add(this.rack); // the synth panel's knobs
+    src.connect(this.an); this.an.connect(this.rack.in); this.rack.out.connect(this.gain).connect(this.ctx.destination); // beat detection before the knobs and the volume
   };
   // The libopenmpt worklet, loaded the first time a module plays (1.5 MB of wasm nobody else needs).
   Jukebox.prototype.tracker = function () {
@@ -103,18 +104,8 @@
     this.avg = this.avg * 0.96 + e * 0.04;
     return Math.exp(-(now - this.beat) * 7);
   };
-  // out (an array) filled with out.length bars 0..1, log-spaced from ~90 Hz to ~16 kHz. Zeros when stopped.
-  Jukebox.prototype.spectrum = function (out) {
-    if (!this.an || !this.playing) return out.fill(0);
-    this.an.getByteFrequencyData(this.bins);
-    const n = out.length, top = Math.min(this.bins.length, 180);
-    for (let i = 0; i < n; i++) {
-      const a = Math.floor(Math.pow(top, i / n)), b = Math.max(a + 1, Math.floor(Math.pow(top, (i + 1) / n)));
-      let m = 0; for (let j = a; j < b; j++) m = Math.max(m, this.bins[j]);
-      out[i] = m / 255;
-    }
-    return out;
-  };
+  // out.length bars 0..1 (spectrumOf, in audio.js). Zeros when stopped.
+  Jukebox.prototype.spectrum = function (out) { return this.an && this.playing ? spectrumOf(this.an, this.bins, out) : out.fill(0); };
   // The player skin, once a frame: spectrum + peak caps on el's canvas, m:ss in .lcd, kHz/kind in
   // .info, and the nod in .bar for the first few seconds of the session's first track.
   Jukebox.prototype.draw = function (el) {

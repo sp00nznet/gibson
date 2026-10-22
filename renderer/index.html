@@ -30,10 +30,37 @@
       <button data-a="music:prev" title="previous (ctrl+shift+[)">|&lt;</button><button data-a="music:toggle" id="pp" title="play/pause (ctrl+shift+P)">&gt;</button><button data-a="music:next" title="next (ctrl+shift+])">&gt;|</button><button data-a="music:shuffle" id="shuf" title="shuffle">SHUF</button><button data-a="music:voldown" title="volume (ctrl+shift+-)">-</button><button data-a="music:volup" title="volume (ctrl+shift+=)">+</button><button data-a="music:pick" title="choose folder">DIR</button>
     </div>
   </div>
+  <div id="sysmon" class="off">
+    <div class="bar">GIBSON SYSMON</div>
+    <canvas id="sm-graph" width="268" height="44"></canvas>
+    <div id="sm-rows"></div>
+    <div id="sm-procs"></div>
+  </div>
+  <div id="synth" class="off">
+    <div class="bar">GIBSON SYNTH</div>
+    <div class="now" id="sy-now"></div>
+    <div class="knobs">
+      <label>CUTOFF<input type="range" data-fx="cut" min="0" max="1" step="0.01" value="1"></label>
+      <label>RESO<input type="range" data-fx="res" min="0" max="1" step="0.01" value="0"></label>
+      <label>LO CUT<input type="range" data-fx="low" min="0" max="1" step="0.01" value="0"></label>
+      <label>DRIVE<input type="range" data-fx="drive" min="0" max="1" step="0.01" value="0"></label>
+      <label>ECHO<input type="range" data-fx="echo" min="0" max="1" step="0.01" value="0"></label>
+      <label class="juke">SPEED<input type="range" id="sy-rate" min="0.5" max="1.5" step="0.01" value="1"></label>
+    </div>
+    <div class="syn">
+      <div class="row" id="sy-styles"></div>
+      <div class="row" id="sy-layers"></div>
+      <div class="row"><button id="sy-down">KEY -</button><button id="sy-up">KEY +</button><button id="sy-next">NEXT SONG</button><button id="sy-reset">RESET</button></div>
+    </div>
+  </div>
   <canvas id="rain"></canvas>
   <canvas id="smoke"></canvas>
   <div id="crt"></div>
-  <div id="boot"><pre id="bootlog"></pre></div>
+  <div id="boot"><pre id="bootlog"></pre><pre id="biologo">   .   *   .      ENERGY
+ *   \ | /   *     ALLY
+--- -( @ )- ---
+ *   / | \   *   (C) GIBSON
+   '   *   '       SYSTEMS</pre></div>
 
   <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
@@ -76,6 +103,52 @@
   <script src="worlds/rocks.js"></script>
   <script src="worlds/lander.js"></script>
   <script src="worlds/stunt.js"></script>
+  <script src="worlds/outatime.js"></script>
+  <script src="worlds/starfighter.js"></script>
+  <script src="worlds/wopr.js"></script>
+  <script src="worlds/spinner.js"></script>
+  <script src="worlds/navigator.js"></script>
+  <script src="worlds/explorers.js"></script>
+  <script src="worlds/headroom.js"></script>
+  <script src="worlds/arrakis.js"></script>
+  <script src="worlds/tracker.js"></script>
+  <script src="worlds/akira.js"></script>
+  <script src="worlds/thermoptic.js"></script>
+  <script src="worlds/cyberbrain.js"></script>
+  <script src="worlds/spidertank.js"></script>
+  <script src="worlds/macross.js"></script>
+  <script src="worlds/radio.js"></script>
+  <script src="worlds/switchboard.js"></script>
+  <script src="worlds/telegraph.js"></script>
+  <script src="worlds/mission.js"></script>
+  <script src="worlds/pneumatic.js"></script>
+  <script src="worlds/mainframe.js"></script>
+  <script src="worlds/videostore.js"></script>
+  <script src="worlds/arcade.js"></script>
+  <script src="worlds/pirateradio.js"></script>
+  <script src="worlds/numbers.js"></script>
+  <script src="worlds/bebop.js"></script>
+  <script src="worlds/eva.js"></script>
+  <script src="worlds/hardsuit.js"></script>
+  <script src="worlds/labor.js"></script>
+  <script src="worlds/gundam.js"></script>
+  <script src="worlds/wired.js"></script>
+  <script src="worlds/yamato.js"></script>
+  <script src="worlds/valkyrie.js"></script>
+  <script src="worlds/real.js"></script>
+  <script src="worlds/datacenter.js"></script>
+  <script src="worlds/usenet.js"></script>
+  <script src="worlds/sky.js"></script>
+  <script src="worlds/defrag.js"></script>
+  <script src="worlds/seti.js"></script>
+  <script src="worlds/sneakers.js"></script>
+  <script src="worlds/demoparty.js"></script>
+  <script src="worlds/ansi.js"></script>
+  <script src="worlds/wardialer.js"></script>
+  <script src="worlds/y2k.js"></script>
+  <script src="worlds/messenger.js"></script>
+  <script src="worlds/geocities.js"></script>
+  <script src="worlds/defcon.js"></script>
   <script src="fx.js"></script>
   <script src="jukebox.js"></script>
   <script src="nyx.js"></script>

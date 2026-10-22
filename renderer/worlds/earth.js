@@ -68,15 +68,25 @@
     const [lat, lon, dl, dn] = REGION[registryOf(ip)], h = hash(ip);
     return [lat + ((h % 1000) / 500 - 1) * dl, lon + (((h >>> 10) % 1000) / 500 - 1) * dn];
   }
-  // Home, from the clock: the UTC offset gives the longitude, the time zone's region a latitude.
+  // Home, from the clock: the time zone's city if it's one we know, else the UTC offset gives the
+  // longitude and the zone's region a latitude. A guess either way; NIGHT SKY and the globes use it.
+  const ZONES = { 'America/Los_Angeles': [34.05, -118.24], 'America/Vancouver': [49.28, -123.12], 'America/Denver': [39.74, -104.99], 'America/Phoenix': [33.45, -112.07],
+    'America/Chicago': [41.88, -87.63], 'America/New_York': [40.71, -74.01], 'America/Toronto': [43.65, -79.38], 'America/Anchorage': [61.22, -149.9], 'Pacific/Honolulu': [21.31, -157.86],
+    'America/Mexico_City': [19.43, -99.13], 'America/Sao_Paulo': [-23.55, -46.63], 'America/Argentina/Buenos_Aires': [-34.6, -58.38], 'America/Bogota': [4.71, -74.07],
+    'Europe/London': [51.51, -0.13], 'Europe/Dublin': [53.35, -6.26], 'Europe/Paris': [48.86, 2.35], 'Europe/Berlin': [52.52, 13.4], 'Europe/Madrid': [40.42, -3.7], 'Europe/Rome': [41.9, 12.5],
+    'Europe/Amsterdam': [52.37, 4.9], 'Europe/Stockholm': [59.33, 18.07], 'Europe/Helsinki': [60.17, 24.94], 'Europe/Warsaw': [52.23, 21.01], 'Europe/Moscow': [55.76, 37.62], 'Europe/Istanbul': [41.01, 28.98],
+    'Asia/Tokyo': [35.68, 139.69], 'Asia/Seoul': [37.57, 126.98], 'Asia/Shanghai': [31.23, 121.47], 'Asia/Hong_Kong': [22.32, 114.17], 'Asia/Singapore': [1.35, 103.82], 'Asia/Kolkata': [28.61, 77.21],
+    'Asia/Dubai': [25.2, 55.27], 'Asia/Jakarta': [-6.2, 106.85], 'Australia/Sydney': [-33.87, 151.21], 'Australia/Melbourne': [-37.81, 144.96], 'Australia/Brisbane': [-27.47, 153.03], 'Australia/Perth': [-31.95, 115.86],
+    'Pacific/Auckland': [-36.85, 174.76], 'Africa/Johannesburg': [-26.2, 28.05], 'Africa/Cairo': [30.04, 31.24], 'Africa/Lagos': [6.52, 3.38], 'Africa/Nairobi': [-1.29, 36.82] };
   function homeSpot() {
     let tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* no Intl */ }
+    if (ZONES[tz]) return ZONES[tz];
     const lon = -new Date().getTimezoneOffset() / 4;
     const lat = /Sao_Paulo|Argentina|Santiago|Lima|Bogota|Montevideo/.test(tz) ? -20 : /^America/.test(tz) ? 38 : /^Europe/.test(tz) ? 50
       : /^Australia/.test(tz) ? -30 : /^Africa/.test(tz) ? 5 : /Auckland/.test(tz) ? -40 : 30;
     return [lat, lon];
   }
-  Worlds.geo = { placeOf, registryOf, spotOf }; // for the self-check
+  Worlds.geo = { placeOf, registryOf, spotOf, homeSpot }; // for the self-check, and NIGHT SKY
 
   // --- the globe ----------------------------------------------------------------
   const vec = (lat, lon) => [Math.cos(lat * D) * Math.sin(lon * D), Math.sin(lat * D), -Math.cos(lat * D) * Math.cos(lon * D)];

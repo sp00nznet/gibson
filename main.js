@@ -116,8 +116,9 @@ function demoHome() {
 // Made-up live data for shot mode.
 const DEMO_NET = () => [['198.51.100.7', 443], ['203.0.113.42', 22], ['192.0.2.80', 443], ['198.51.100.23', 6697], ['203.0.113.9', 993],
   ['192.0.2.14', 80], ['198.51.100.99', 443], ['203.0.113.77', 5228], ['192.0.2.200', 9418]].map(([ip, port]) => ({ ip, port, service: sys.SERVICES[port] || `port ${port}` }));
-const DEMO_PROCS = () => ['gibson', 'zerocool', 'acidburn', 'plague-daemon', 'da-vinci', 'worm', 'kernel-sentry', 'ellingson-sync', 'phreak', 'cereal', 'nikon', 'garbage-collector', 'modem', 'bbs-door']
+const DEMO_PROCS = () => ['gibson', 'zerocool', 'acidburn', 'plague-daemon', 'da-vinci', 'kernel-sentry', 'ellingson-sync', 'phreak', 'cereal', 'nikon', 'garbage-collector', 'modem', 'bbs-door']
   .map((name, i) => ({ name, cpu: i === 4 ? 92 : Math.random() * 12, mem: (14 - i) * 40e6 + Math.random() * 20e6, n: 1 + (i % 3) }));
+const DEMO_STATS = () => ({ cpu: 30 + Math.random() * 40, cores: 16, mem: { total: 32e9, free: 11e9 }, disks: [{ name: 'C:', total: 1e12, free: 3.1e11 }, { name: 'D:', total: 4e12, free: 2.6e12 }], net: { rx: Math.random() * 3e6, tx: Math.random() * 4e5 }, up: 412345 });
 const DEMO_NEWS = () => ['Gibson mainframe breached by unknown worm', 'Da Vinci virus threatens oil tankers, experts say', 'Ellingson Mineral denies garbage file exists',
   'Hackers urged to stop hacking the planet', 'Phone phreaks return as modems make a comeback', 'Zero Cool banned from computers until 18th birthday']
   .map((title) => ({ title, link: '', source: 'GIBSON WIRE' }));
@@ -285,7 +286,7 @@ function listDir(dir) {
 
 // Ctrl+Shift + these keys, by key code (the shifted characters differ by keyboard layout)
 const CODEKEYS = { BracketRight: 'music:next', BracketLeft: 'music:prev', Equal: 'music:volup', Minus: 'music:voldown' };
-const HOTKEYS = { I: 'irc', C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', F: 'find', U: 'frame', S: 'scroller', L: 'logo', D: 'packets', P: 'music:toggle', J: 'music:source', A: 'broadcast', Z: 'zoompane' };
+const HOTKEYS = { I: 'irc', C: 'copy', V: 'paste', M: 'music', B: 'tempo', N: 'nyx', W: 'world', R: 'rain', T: 'newtab', X: 'closetab', O: 'opacity', K: 'synth', G: 'sysmon', F: 'find', U: 'frame', S: 'scroller', L: 'logo', D: 'packets', P: 'music:toggle', J: 'music:source', A: 'broadcast', Z: 'zoompane' };
 // Ctrl + these (no Shift): font size, as in every terminal and browser
 const ZOOMKEYS = { Equal: 'font:up', NumpadAdd: 'font:up', Minus: 'font:down', NumpadSubtract: 'font:down', Digit0: 'font:reset', Numpad0: 'font:reset' };
 const TAB_COLOURS = [['None', ''], ['Pink', '#ff2e88'], ['Green', '#39ff9c'], ['Ice', '#36d6ff'], ['Gold', '#ffc448'], ['Violet', '#a860ff'], ['Red', '#ff3864']];
@@ -419,9 +420,13 @@ async function keyFromClipboard() {
 
 // World menu sections. A world not listed here lands under Other.
 const WORLD_GROUPS = [
-  ['Cyberspace', ['grid', 'tunnel', 'core', 'ice', 'git', 'files', 'garbage', 'bbs', 'hack']],
+  ['Cyberspace', ['grid', 'tunnel', 'core', 'ice', 'git', 'files', 'garbage', 'bbs', 'hack', 'datacenter', 'usenet']],
   ['Cities', ['city', 'skyline', 'cyberpunk', 'ruins', 'street', 'towers', 'highway']],
-  ['Out there', ['planet', 'battle', 'sea']],
+  ['Out there', ['sky', 'planet', 'battle', 'sea']],
+  ['Sci-fi', ['outatime', 'starfighter', 'wopr', 'spinner', 'navigator', 'explorers', 'headroom', 'arrakis', 'tracker', 'real']],
+  ['Scene', ['defrag', 'seti', 'sneakers', 'demoparty', 'ansi', 'wardialer', 'y2k', 'messenger', 'geocities', 'defcon']],
+  ['Old tech', ['radio', 'switchboard', 'telegraph', 'mission', 'pneumatic', 'mainframe', 'videostore', 'arcade', 'pirateradio', 'numbers']],
+  ['Anime', ['akira', 'thermoptic', 'cyberbrain', 'spidertank', 'macross', 'bebop', 'eva', 'hardsuit', 'labor', 'gundam', 'wired', 'yamato', 'valkyrie']],
   ['Arcade', ['battlezone', 'cycles', 'deathmatch', 'endless', 'antigrav', 'tube', 'trench', 'trader', 'rocks', 'lander', 'stunt']],
   ['Visualizers', ['rave', 'milkdrop', 'kaleido', 'starburst', 'attractor', 'helix', 'life']],
   ['Screensavers', ['toasters', 'mystify', 'pipes', 'maze', 'flowerbox', 'fringe', 'nocturne', 'keygen']],
@@ -456,6 +461,7 @@ function nyxMenu(st, act, item) {
   return [
     item('On', 'nyx', 'N', { type: 'checkbox', checked: st.nyx }),
     { label: 'Speaks 1337', type: 'checkbox', checked: st.leet, click: act('leet') },
+    { label: 'Message chimes', type: 'checkbox', checked: st.chimes, click: act('chimes') },
     { type: 'separator' },
     { label: 'Brain', enabled: false },
     radio('local', `Built-in: ${local.byId(localPick).name}${local.have(local.byId(localPick)) ? '' : '  (not downloaded)'}`),
@@ -517,6 +523,9 @@ function contextMenu(st) {
     { label: 'Music', submenu: [
       item('On', 'music', 'M', { type: 'checkbox', checked: st.music }),
       item('Tempo follows activity', 'tempo', 'B', { type: 'checkbox', checked: st.reactive }),
+      item('Synth panel', 'synth', 'K'),
+      { label: 'Worlds dance to the music', type: 'checkbox', checked: st.dance, click: act('dance') },
+      { label: 'Keyboard sounds', type: 'checkbox', checked: st.keyclick, click: act('keyclick') },
       { type: 'separator' },
       { label: 'Synth (follows your activity)', type: 'radio', checked: st.source === 'synth', click: act('music:synth') },
       { label: st.folder ? `Folder: ${path.basename(st.folder)}` : 'Folder (none chosen)', type: 'radio', checked: st.source === 'folder', click: act('music:folder') },
@@ -541,8 +550,16 @@ function contextMenu(st) {
       item('Scroller', 'scroller', 'S', { type: 'checkbox', checked: st.scroller }),
       item('Logo', 'logo', 'L', { type: 'checkbox', checked: st.logo }),
       item('Data packets', 'packets', 'D', { type: 'checkbox', checked: st.packets }),
+      { label: 'Ships flying by', type: 'checkbox', checked: st.ships, click: act('ships') },
+      item('System monitor', 'sysmon', 'G', { type: 'checkbox', checked: st.sysmon }),
       { label: 'Cigarette while compiling', type: 'checkbox', checked: cfg.cigarette !== false, click: act('cigarette') },
       item('Matrix rain', 'rain', 'R'),
+      { type: 'separator' },
+      { label: 'Hollywood hacking', type: 'checkbox', checked: st.hollywood, click: act('hollywood') },
+      { label: 'CRT mode', type: 'checkbox', checked: st.crt, click: act('crt') },
+      { label: 'Blue screen on errors', type: 'checkbox', checked: st.bsod, click: act('bsod') },
+      { label: 'Window style: classic', type: 'checkbox', checked: st.classic, click: act('classic') },
+      { label: 'BIOS boot screen', type: 'checkbox', checked: st.bios, click: act('bios') },
       { type: 'separator' },
       { label: 'Pane opacity', submenu: [
         ...[1, 0.86, 0.7, 0.5, 0.3, 0.15, 0].map((o) => ({ label: `${Math.round(o * 100)}%`, type: 'radio', checked: Math.abs(o - st.opacity) < 0.01, click: act('opacity:' + o) })),
@@ -705,7 +722,7 @@ app.whenReady().then(() => {
   ipcMain.on('irc:command', (_e, line, target) => { if (irc) irc.command(String(line), String(target || '')); });
   ipcMain.handle('fs:list', (_e, id) => { const d = (panes.get(id) || { cwd: home }).cwd; return { cwd: SHOT ? 'C:\\GIBSON' : d, entries: listDir(d) }; });
   ipcMain.on('cfg:save', (_e, key, v) => { // view choices remembered across restarts
-    if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'cigarette', 'fontSize', 'pasteGuard', 'ircOpen'].includes(key)) writeCfg(key, v);
+    if (['opacity', 'framed', 'scroller', 'logo', 'packets', 'music', 'nyxWorlds', 'dance', 'sysmon', 'ships', 'hollywood', 'crt', 'keyclick', 'chimes', 'bios', 'bsod', 'classic', 'cigarette', 'fontSize', 'pasteGuard', 'ircOpen'].includes(key)) writeCfg(key, v);
     if (key === 'nyxLeet') writeCfg('nyx', { ...cfg.nyx, leet: !!v });
   });
   // The tabs as they are now become the start tabs. The page sends each tab's first pane id
@@ -722,6 +739,9 @@ app.whenReady().then(() => {
   ipcMain.handle('git:log', (_e, id) => gitLog((panes.get(id) || { cwd: home }).cwd));
   ipcMain.handle('sys:net', () => (SHOT ? DEMO_NET() : sys.netConns()));
   ipcMain.handle('sys:procs', () => (SHOT ? DEMO_PROCS() : sys.procs()));
+  ipcMain.handle('sys:stats', () => (SHOT ? DEMO_STATS() : sys.stats()));
+  ipcMain.handle('sys:hw', async () => (SHOT ? { cpu: 'GIBSON 80686 MMX', mhz: 666, cores: 8, mem: 64 * 2 ** 30, disks: DEMO_STATS().disks } // the BIOS screen
+    : { cpu: os.cpus()[0].model, mhz: os.cpus()[0].speed, cores: os.cpus().length, mem: os.totalmem(), disks: (await sys.stats()).disks }));
   ipcMain.handle('music:list', () => listMusic(cfg.music.folder));
   ipcMain.handle('music:pick', async () => {
     const r = await dialog.showOpenDialog(win, { title: 'Choose a music folder', properties: ['openDirectory'], defaultPath: cfg.music.folder || app.getPath('music') });

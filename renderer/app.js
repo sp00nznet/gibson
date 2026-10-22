@@ -11,6 +11,14 @@
   // NYX changes the world unless --world pins it (screenshots) or the user turned that off.
   const go = (w) => { if (!B.world && cfg.nyxWorlds !== false && w) Worlds.go(Array.isArray(w) ? w[Math.floor(Math.random() * w.length)] : w); };
   let music = null, pulse = 0, warp = 0;
+  // On/off extras, each a right-click checkbox saved under its own key; the value is its default.
+  const EXTRAS = { hollywood: false, crt: false, keyclick: false, chimes: true, bios: false, bsod: false, classic: false };
+  const flag = (k) => (cfg[k] === undefined ? EXTRAS[k] : !!cfg[k]);
+  const applyLook = () => { document.body.classList.toggle('crt', flag('crt')); document.body.classList.toggle('classic', flag('classic')); };
+  applyLook();
+  const sfx = new Sfx(() => (B.mute || B.shot ? 0 : cfg.music.volume));
+  let chimeAt = 0; // one chime at a time: an error that NYX then talks about rings once
+  const chime = (k) => { if (!flag('chimes') || Date.now() - chimeAt < 1500) return; chimeAt = Date.now(); sfx.chime(k); };
 
   // --- terminals: 1 to 4 tiled panes. Each pane has its own shell. ---------
   const TERM_OPTS = {
@@ -147,7 +155,7 @@
   // from: the pane whose folder the new shell starts in (split from here)
   function makePane(t, from, adoptId) {
     const id = adoptId || nextId++, el = document.createElement('div');
-    el.className = 'pane'; t.el.appendChild(el);
+    el.className = 'pane'; el.dataset.title = 'GIBSON Prompt'; t.el.appendChild(el); // the title is for the classic window style
     const term = new Terminal(TERM_OPTS), fit = new FitAddon.FitAddon(), search = new SearchAddon.SearchAddon();
     term.loadAddon(fit); term.loadAddon(search);
     fileLinks(term, id);
@@ -169,6 +177,7 @@
     // shell has echoed what was typed.
     term.onData((d) => {
       act.key(d[0] === '\x7f' || d[0] === '\x1b' ? 0.1 : 1); // backspace and arrows aren't a frenzy
+      if (flag('keyclick')) sfx.key(d === '\r' ? 'enter' : d === ' ' ? 'space' : 'key');
       const enter = d === '\r' || d === '\n';
       const shown = enter ? typedLine(p) : null;
       const raw = shown && shown.trim() ? shown : enter ? p.line : '';
@@ -270,7 +279,7 @@
     if (focused === p) return;
     focused = p; p.tab.focused = p;
     for (const x of p.tab.panes) x.el.classList.toggle('focus', x === p);
-    window.gibson.listDir(p.id).then((fs) => { worldEnv.fs = fs; Worlds.refreshFiles(); p.tab.cwdName = baseName(fs.cwd); label(p.tab); });
+    window.gibson.listDir(p.id).then((fs) => { worldEnv.fs = fs; Worlds.refreshFiles(); p.tab.cwdName = baseName(fs.cwd); p.el.dataset.title = `GIBSON Prompt - ${p.tab.cwdName}`; label(p.tab); });
     refreshGit(p);
   }
   // Growing adds panes; shrinking closes the newest ones, never the focused one.
@@ -290,12 +299,14 @@
     const plain = d.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07/g, '');
     p.outTail = (p.outTail + plain).slice(-2000);
     if (!p.errorSeen && p.lastCmd && /(error|not recognized|command not found|fatal:|exception|failed|denied)/i.test(plain)) {
-      p.errorSeen = true; Worlds.signal('error'); nyx.event('error', { cmd: p.lastCmd, output: p.outTail }, true); ircPanel.event('error', p.lastCmd);
+      p.errorSeen = true; Worlds.signal('error'); chime('error'); if (flag('bsod')) bsod(p); nyx.event('error', { cmd: p.lastCmd, output: p.outTail }, true); ircPanel.event('error', p.lastCmd);
     }
   });
 
   function onCommand(p, cmd) {
     p.lastCmd = cmd; p.errorSeen = false; p.cmdAt = cmd ? Date.now() : 0;
+    if (cmd) worldEnv.cmd = { text: cmd, at: Date.now() }; // the telegraph taps it out
+    if (cmd && flag('hollywood')) hollywood(p);
     window.gibson.line(p.id, cmd);
     if (NYX_KIND(cmd) === 'cd') setTimeout(async () => {
       worldEnv.fs = await window.gibson.listDir(p.id); go('files'); Worlds.refreshFiles();
@@ -307,6 +318,38 @@
     nyx.command(cmd);
     if (cmd) ircPanel.event(/^git\s+commit\b/i.test(cmd) ? 'commit' : NYX_KIND(cmd), cmd);
     if (NYX_KIND(cmd) === 'danger') Theatre.alert(null, { cmd }); // the Da Vinci treatment
+  }
+
+  // Hollywood hacking: every command gets the movie treatment over its pane, hands off the keys.
+  const HW_LINES = ['BYPASSING FIREWALL', 'DECRYPTING PAYLOAD', 'TRACING ROUTE', 'SPOOFING MAC ADDRESS', 'INJECTING SHELLCODE', 'CRACKING ROOT PASSWORD', 'ROUTING THROUGH 7 PROXIES', 'DISABLING THE ICE'];
+  function hollywood(p) {
+    const now = Date.now(); if (now - (p.hwAt || 0) < 2400) return; // typing faster than the movie: skip
+    p.hwAt = now;
+    const el = document.createElement('div'), hex = document.createElement('pre'), box = document.createElement('div');
+    el.className = 'hw'; hex.className = 'hex'; box.className = 'steps'; el.append(hex, box); p.el.appendChild(el);
+    const lines = HW_LINES.slice().sort(() => Math.random() - 0.5).slice(0, 2 + Math.floor(Math.random() * 3));
+    const h4 = () => Math.floor(Math.random() * 65536).toString(16).toUpperCase().padStart(4, '0');
+    const spin = setInterval(() => { hex.textContent = Array.from({ length: 16 }, () => Array.from({ length: 6 }, h4).join(' ')).join('\n'); }, 50);
+    lines.forEach((l, i) => setTimeout(() => {
+      const d = document.createElement('div'), bar = document.createElement('span'), fill = document.createElement('i');
+      d.textContent = l + '... '; bar.className = 'bar'; bar.appendChild(fill); d.appendChild(bar); box.appendChild(d);
+      requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = '100%'; }));
+    }, i * 1200 / lines.length));
+    setTimeout(() => {
+      clearInterval(spin); hex.textContent = '';
+      const r = document.createElement('div'); r.className = 'verdict ' + (p.errorSeen ? 'no' : 'yes'); r.textContent = p.errorSeen ? 'ACCESS DENIED' : 'ACCESS GRANTED'; el.appendChild(r);
+    }, 1400);
+    setTimeout(() => el.classList.add('out'), 2000);
+    setTimeout(() => el.remove(), 2450);
+  }
+  // A blue screen over the pane when a command fails, at most every 20 s. It never takes a key.
+  let bsodAt = 0;
+  function bsod(p) {
+    const now = Date.now(); if (now - bsodAt < 20000) return; bsodAt = now;
+    const h4 = () => Math.floor(Math.random() * 65536).toString(16).toUpperCase().padStart(4, '0');
+    const el = document.createElement('div'); el.className = 'bsod';
+    el.innerHTML = `<div class="t"><span> GIBSON </span></div>\nA fatal exception 0E has occurred at 0028:${h4()}${h4()} in VXD GIBSON(01) +\n0001${h4()}. The current command will be terminated.\n\n*  Press any key to pretend this never happened.\n*  Press CTRL+ALT+DEL again to hack the planet. You will\n   lose any unsaved information in all applications.\n\n<div class="t">Press any key to continue <span class="cur">_</span></div>`;
+    p.el.appendChild(el); setTimeout(() => el.classList.add('out'), 1200); setTimeout(() => el.remove(), 1700);
   }
 
   // The set pieces (renderer/theatre.js) and the BBS (bbs/bbs.js), each a command of its own.
@@ -387,6 +430,7 @@
     llm: (ev) => (ev.kind === 'chat' ? window.gibson.agent({ ...ev, pane: (nyxPane || focused).id }) : window.gibson.llm(ev)),
     say(said, mood, world) {
       const text = cfg.nyx.leet ? leet(said) : said;
+      chime('say');
       const el = $('nyxtext'); el.textContent = ''; let i = 0;
       $('nyx').classList.remove('glitch'); void $('nyx').offsetWidth; $('nyx').classList.add('glitch');
       const iv = setInterval(() => { el.textContent = text.slice(0, ++i); if (i >= text.length) clearInterval(iv); }, 28);
@@ -412,7 +456,7 @@
 
   // --- worlds + fx ------------------------------------------------------------
   worldEnv.fs = await window.gibson.listDir(focused.id);
-  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news, packets: cfg.packets !== false, spec: jukeOn() ? juke.spectrum(specBuf) : null, home: B.shot ? [40.7, -74] : null }));
+  Worlds.start($('world'), () => ({ level: act.level(), pulse, warp, fs: worldEnv.fs, git: worldEnv.git, net: worldEnv.net, procs: worldEnv.procs, news: worldEnv.news, packets: cfg.packets !== false, ships: cfg.ships !== false, spec: jukeOn() ? juke.spectrum(specBuf) : music && music.on ? music.spectrum(specBuf) : null, dance: cfg.dance !== false, cmd: worldEnv.cmd, build: act.busyOut, song: jukeOn() ? juke.title : music && music.on ? music.styleName : '', home: B.shot ? [40.7, -74] : null }));
 
   const specBuf = new Float32Array(48); // the jukebox's spectrum, for the Milkdrop worlds
 
@@ -427,7 +471,7 @@
         services.add(c.service); if (!first) nyx.event('net', { detail: `a new connection to ${c.service}` }, false);
       }
     }
-    if (now - procAt > (w === 'hive' ? 3000 : 30000)) {
+    if (now - procAt > (w === 'hive' || mon.on ? 3000 : 30000)) {
       procAt = now; worldEnv.procs = await window.gibson.procs();
       for (const p of worldEnv.procs) { // two hot polls in a row is a hog, said once per process
         const n = p.cpu > 80 ? (hogs.get(p.name) || 0) + 1 : 0; hogs.set(p.name, n);
@@ -439,7 +483,7 @@
     const fresh = items.filter((i) => !titles.has(i.title)), first = !worldEnv.news;
     for (const i of items) titles.add(i.title);
     worldEnv.news = items;
-    if (!first && fresh.length) { Worlds.signal('news'); nyx.event('news', { headline: fresh[0].title, detail: fresh[0].source }, false); ircPanel.event('news', fresh[0].title); }
+    if (!first && fresh.length) { Worlds.signal('news'); chime('news'); nyx.event('news', { headline: fresh[0].title, detail: fresh[0].source }, false); ircPanel.event('news', fresh[0].title); }
   });
   if (B.world || cfg.world) Worlds.go(B.world || cfg.world);
   Fx.start({ logo: $('logo'), scroller: $('scroller'), rain: $('rain'), smoke: $('smoke') },
@@ -493,6 +537,65 @@
     showPlayer(); saveMusic();
   }
   for (const b of document.querySelectorAll('#player button')) b.onclick = () => { musicAction(b.dataset.a); focused.term.focus(); };
+  // The synth panel: knobs on whatever is playing (FX, read by each source's Rack in audio.js),
+  // plus the synth's own controls. ponytail: settings last the session; save them if anyone asks.
+  const LAYERS = [['kick', 'KICK'], ['snare', 'SNARE'], ['hats', 'HATS'], ['bass', 'BASS'], ['acid', 'LEAD'], ['guitar', 'GTR'], ['pad', 'PAD'], ['all', 'ALL IN']];
+  function synthPaint() {
+    const el = $('synth'); if (el.classList.contains('off')) return;
+    el.classList.toggle('juke', jukeOn());
+    $('sy-now').textContent = jukeOn() ? juke.title || '' : music ? `${music.styleName || '--'}  ${Math.round(music.bpm)} BPM  KEY ${music.shift > 0 ? '+' : ''}${music.shift}` : 'SYNTH OFF';
+    for (const b of $('sy-styles').children) b.classList.toggle('lit', ((music && music.lock && music.lock.name) || 'AUTO') === b.dataset.k);
+    for (const b of $('sy-layers').children) b.classList.toggle('lit', !!music && (b.dataset.k === 'all' ? music.allIn : !music.mute.has(b.dataset.k)));
+  }
+  function synthRow(id, items, click) {
+    for (const [k, label] of items) { const b = document.createElement('button'); b.textContent = label; b.dataset.k = k; b.onclick = () => { if (music) click(k); synthPaint(); focused.term.focus(); }; $(id).append(b); }
+  }
+  synthRow('sy-styles', [['AUTO', 'AUTO'], ...Techno.STYLES.map((n) => [n, n])], (k) => music.setStyle(k));
+  synthRow('sy-layers', LAYERS, (k) => { if (k === 'all') music.allIn = !music.allIn; else if (music.mute.has(k)) music.mute.delete(k); else music.mute.add(k); });
+  $('sy-down').onclick = () => { if (music) music.shift = Math.max(-12, music.shift - 1); synthPaint(); };
+  $('sy-up').onclick = () => { if (music) music.shift = Math.min(12, music.shift + 1); synthPaint(); };
+  $('sy-next').onclick = () => { if (music) music.skip(); setTimeout(synthPaint, 300); };
+  $('sy-reset').onclick = () => {
+    Object.assign(FX, { cut: 1, res: 0, low: 0, drive: 0, echo: 0 }); Rack.update();
+    for (const i of document.querySelectorAll('#synth [data-fx]')) i.value = FX[i.dataset.fx];
+    $('sy-rate').value = 1; juke.audio.playbackRate = 1;
+    if (music) { music.lock = null; music.mute.clear(); music.shift = 0; music.allIn = false; }
+    synthPaint();
+  };
+  for (const i of document.querySelectorAll('#synth [data-fx]')) i.oninput = () => { FX[i.dataset.fx] = +i.value; Rack.update(); };
+  $('sy-rate').oninput = () => { juke.audio.preservesPitch = false; juke.audio.playbackRate = +$('sy-rate').value; }; // tape speed: pitch goes with it
+  setInterval(synthPaint, 500);
+
+  // The system monitor: CPU, memory, disks, network rates and the top processes, polled once a
+  // second while it's open. Processes come from the same poll the PROCESS HIVE uses (below).
+  const mon = { on: cfg.sysmon === true, cpu: [], rx: [], tx: [] };
+  $('sysmon').classList.toggle('off', !mon.on);
+  const bytes = (n) => { const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; while (n >= 1024 && i < 4) { n /= 1024; i++; } return `${n.toFixed(n < 10 && i ? 1 : 0)} ${u[i]}`; };
+  const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const meterRow = (label, frac, text) => `<div class="row"><span>${label}</span><div class="meter"><i class="${frac > 0.85 ? 'hot' : ''}" style="width:${Math.round(Math.min(1, frac) * 100)}%"></i></div><span class="v">${text}</span></div>`;
+  function monGraph() { // CPU (green) and network in/out (ice/pink, scaled to the busiest second shown)
+    const cv = $('sm-graph'), g = cv.getContext('2d'), W = cv.width, H = cv.height, n = 60;
+    g.clearRect(0, 0, W, H);
+    const line = (vals, max, col) => { g.strokeStyle = col; g.beginPath(); vals.forEach((v, i) => { const x = W - (vals.length - 1 - i) * W / (n - 1), y = H - 2 - (v / max) * (H - 4); if (i) g.lineTo(x, y); else g.moveTo(x, y); }); g.stroke(); };
+    const top = Math.max(1024, ...mon.rx, ...mon.tx);
+    g.lineWidth = 1; line(mon.rx, top, '#36d6ff'); line(mon.tx, top, '#ff2e88'); g.lineWidth = 1.5; line(mon.cpu, 100, '#39ff9c');
+  }
+  async function monPoll() {
+    if (!mon.on) return;
+    const s = await window.gibson.stats(); if (!mon.on) return;
+    for (const [k, v] of [['cpu', s.cpu], ['rx', s.net.rx], ['tx', s.net.tx]]) { mon[k].push(v); if (mon[k].length > 60) mon[k].shift(); }
+    const used = s.mem.total - s.mem.free;
+    $('sm-rows').innerHTML = meterRow('CPU', s.cpu / 100, `${Math.round(s.cpu)}% x${s.cores}`)
+      + meterRow('MEM', used / s.mem.total, `${bytes(s.mem.free)} free`)
+      + s.disks.map((d) => meterRow(esc(d.name), 1 - d.free / d.total, `${bytes(d.free)} free`)).join('')
+      + `<div class="row"><span>NET</span><span style="color:#36d6ff">IN ${bytes(s.net.rx)}/s</span><span class="v" style="color:#ff2e88">OUT ${bytes(s.net.tx)}/s</span></div>`;
+    const ps = (worldEnv.procs || []).slice().sort((a, b) => b.cpu - a.cpu).slice(0, 6);
+    $('sm-procs').innerHTML = '<div class="p h"><span>PROCESS</span><span>CPU</span><span>MEM</span></div>'
+      + ps.map((p) => `<div class="p"><span>${esc(p.name)}${p.n > 1 ? ' x' + p.n : ''}</span><span>${(p.cpu / s.cores).toFixed(1)}%</span><span>${bytes(p.mem)}</span></div>`).join('');
+    monGraph();
+  }
+  setInterval(monPoll, 1000);
+  function toggleMon() { mon.on = !mon.on; $('sysmon').classList.toggle('off', !mon.on); window.gibson.save('sysmon', mon.on); if (mon.on) { procAt = 0; monPoll(); } }
   function action(a) {
     const t = focused.term;
     if (a === 'copy') navigator.clipboard.writeText(t.getSelection());
@@ -513,11 +616,16 @@
       saveMusic();
     }
     else if (a.startsWith('music:')) return musicAction(a);
+    else if (a === 'synth') { $('synth').classList.toggle('off'); synthPaint(); }
     else if (a === 'logo') { setLogo(!cfg.logo); window.gibson.save('logo', cfg.logo); }
     else if (a === 'cigarette') { cfg.cigarette = cfg.cigarette === false; window.gibson.save('cigarette', cfg.cigarette); }
+    else if (Object.hasOwn(EXTRAS, a)) { cfg[a] = !flag(a); window.gibson.save(a, cfg[a]); applyLook(); }
+    else if (a === 'sysmon') toggleMon();
+    else if (a === 'dance') { cfg.dance = cfg.dance === false; window.gibson.save('dance', cfg.dance); }
     else if (a === 'nyxworlds') { cfg.nyxWorlds = cfg.nyxWorlds === false; window.gibson.save('nyxWorlds', cfg.nyxWorlds); }
     else if (a === 'tabs:save') { window.gibson.saveTabs(tabs.map((x) => ({ id: x.panes[0].id, panes: x.panes.length, name: x.opts.name, color: x.opts.color }))); nyx.ctx.say(`${tabs.length} tab${tabs.length > 1 ? 's' : ''} saved. They will be waiting next time.`, 'tender'); }
     else if (a === 'packets') { cfg.packets = cfg.packets === false; window.gibson.save('packets', cfg.packets); }
+    else if (a === 'ships') { cfg.ships = cfg.ships === false; window.gibson.save('ships', cfg.ships); }
     else if (a === 'tempo') { cfg.music.mode = cfg.music.mode === 'reactive' ? 'fixed' : 'reactive'; nyx.ctx.say(`Tempo ${cfg.music.mode === 'fixed' ? 'locked at ' + cfg.music.bpm : 'follows your hands'}.`, 'playful'); }
     else if (a === 'ask:ollama' || a === 'ask:openai') {
       const p = a.slice(4), was = (cfg.llm.urls || {})[p];
@@ -558,7 +666,8 @@
       selection: !!focused.term.getSelection(), panes: tab.panes.length, zoomed: !!tab.zoom, broadcast: !!tab.broadcast, tabColor: tab.opts.color || '', tabs: tabs.length, opacity: focused.opacity, framed: cfg.framed, scroller: cfg.scroller !== false,
       worlds: Worlds.names.map((n) => [n, Worlds.label(n)]), world: Worlds.current(),
       irc: ircPanel.visible, leet: !!cfg.nyx.leet, music: !!cfg.music.on, reactive: cfg.music.mode === 'reactive', nyx: !!cfg.nyx.on,
-      source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false, packets: cfg.packets !== false,
+      source: jukeOn() ? 'folder' : 'synth', folder: cfg.music.folder, shuffle: juke.shuffle, logo: cfg.logo !== false, packets: cfg.packets !== false, dance: cfg.dance !== false, sysmon: mon.on, ships: cfg.ships !== false,
+      ...Object.fromEntries(Object.keys(EXTRAS).map((k) => [k, flag(k)])),
     });
   });
 
@@ -614,19 +723,36 @@
   async function bootSequence() {
     const log = $('bootlog'), out = (s) => { log.textContent += s; };
     let skip = false; const skipper = () => { skip = true; }; addEventListener('keydown', skipper);
-    let dial = null; try { dial = new Techno(); dial.volume(0); } catch { /* no audio device */ }
-    const steps = [['ATZ\n', 300], ['OK\n', 400], ['ATDT 555-0199\n', 200]];
-    for (const [s, ms] of steps) { if (skip) break; out(s); await sleep(ms); }
-    const len = dial && !skip ? dial.dialup('5550199', B.shot ? 0 : 1) : 0;
-    const lines = ['RINGING...\n', 'CARRIER 2100Hz\n', 'NEGOTIATING V.90 ...\n', 'PROTOCOL: LAPM / V.42BIS\n', 'CONNECT 57600\n\n', `ACCESSING GIBSON MAINFRAME AS ${B.user.toUpperCase()}...\n`, 'NYX ONLINE.\n'];
-    for (const s of lines) { if (skip) break; out(s); await sleep((len * 1000) / lines.length); }
-    if (dial) dial.ctx.close();
+    if (flag('bios')) { // a 90s power-on self test first: this machine's real CPU, memory and drives (made up in screenshots)
+      $('boot').classList.add('bios');
+      const hw = await window.gibson.hw(), wait = (ms) => (skip ? null : sleep(ms));
+      out(`GIBSON BIOS v4.51PG, An Energy Ally\nCopyright (C) 1984-99, Gibson Systems, Inc.\n\n#401A0-0207\n\n${hw.cpu.trim()} at ${hw.mhz}MHz, ${hw.cores} threads\n\n`);
+      await wait(500);
+      const base = log.textContent, kb = Math.round(hw.mem / 1024);
+      for (let i = 1; i <= 24 && !skip; i++) { log.textContent = `${base}Memory Test :  ${Math.round(kb * i / 24)}K`; await wait(45); }
+      log.textContent = `${base}Memory Test :  ${kb}K OK\n\n`;
+      const SLOT = ['Primary Master  ', 'Primary Slave   ', 'Secondary Master', 'Secondary Slave '];
+      for (const [i, d] of hw.disks.entries()) { if (skip) break; out(`Detecting IDE ${SLOT[i] || `SCSI ID ${i}       `} ... ${d.name} ${(d.total / 1e9).toFixed(0)} GB\n`); await wait(160); }
+      const now = new Date(), date = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
+      out(`\nPress DEL to enter SETUP\n${date}-GIBSON-PG-2A69KG0BC-00\n`);
+      await wait(1100);
+      log.textContent = ''; $('boot').classList.remove('bios'); skip = false;
+    }
+    if (cfg.boot) {
+      let dial = null; try { dial = new Techno(); dial.volume(0); } catch { /* no audio device */ }
+      const steps = [['ATZ\n', 300], ['OK\n', 400], ['ATDT 555-0199\n', 200]];
+      for (const [s, ms] of steps) { if (skip) break; out(s); await sleep(ms); }
+      const len = dial && !skip ? dial.dialup('5550199', B.shot ? 0 : 1) : 0;
+      const lines = ['RINGING...\n', 'CARRIER 2100Hz\n', 'NEGOTIATING V.90 ...\n', 'PROTOCOL: LAPM / V.42BIS\n', 'CONNECT 57600\n\n', `ACCESSING GIBSON MAINFRAME AS ${B.user.toUpperCase()}...\n`, 'NYX ONLINE.\n'];
+      for (const s of lines) { if (skip) break; out(s); await sleep((len * 1000) / lines.length); }
+      if (dial) dial.ctx.close();
+    }
     removeEventListener('keydown', skipper);
     $('boot').classList.add('gone'); focused.term.focus();
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  if (cfg.boot && (!B.shot || B.bootShot)) await bootSequence(); else $('boot').classList.add('gone');
+  if ((cfg.boot || flag('bios')) && (!B.shot || B.bootShot)) await bootSequence(); else $('boot').classList.add('gone');
   if (cfg.music.source === 'folder' && cfg.music.folder) juke.load(await window.gibson.musicList());
   focused.term.focus(); if (jukeOn()) useSource('folder'); else startMusic();
   nyx.event('boot', {}, true);

@@ -90,6 +90,29 @@ is anyone's real machine.
 | ![Vector tube](docs/screenshots/tube.png) **VECTOR TUBE**: a claw on the rim of a tube, flippers climbing up it | ![Trench run](docs/screenshots/trench.png) **TRENCH RUN**: down the trench, turrets firing, then the exhaust port |
 | ![Free trader](docs/screenshots/trader.png) **FREE TRADER**: pirates, docking, hyperspace, trading between systems | ![Rock field](docs/screenshots/rocks.png) **ROCK FIELD**: asteroids in 3D, splitting as they're shot |
 | ![Lunar lander](docs/screenshots/lander.png) **LUNAR LANDER**: an autopilot that usually lands | ![Stunt track](docs/screenshots/stunt.png) **STUNT TRACK**: a raised track with jumps, a rival and a crane |
+| ![Outatime](docs/screenshots/outatime.png) **OUTATIME**: a DeLorean builds to 88 mph as you type, folds its wheels and flies off, leaving fire trails | ![Starfighter](docs/screenshots/starfighter.png) **STARFIGHTER**: the Gunstar holds the Frontier against Ko-Dan waves; every 20 kills, the Death Blossom |
+| ![Wopr](docs/screenshots/wopr.png) **WOPR**: the war room runs every scenario, faster and faster, until it learns | ![Spinner](docs/screenshots/spinner.png) **SPINNER**: a police flyer in the rain between arcologies and burning refinery stacks |
+| ![Navigator](docs/screenshots/navigator.png) **NAVIGATOR**: a chrome teardrop ship skimming the sea and hills | ![Explorers](docs/screenshots/explorers.png) **EXPLORERS**: a homemade bubble ship from a backyard to the stars |
+| ![Blipvert](docs/screenshots/headroom.png) **BLIPVERT**: a stuttering TV host in a spinning room of grids | ![Arrakis](docs/screenshots/arrakis.png) **ARRAKIS**: dunes, an ornithopter, wormsign, then the worm |
+| ![Motion Tracker](docs/screenshots/tracker.png) **MOTION TRACKER**: a corridor, a pinging tracker, sentry guns counting down | ![The Real](docs/screenshots/real.png) **THE REAL**: a battered hovercraft through ruined tunnels and the scorched surface, sentinels and the EMP |
+| ![Neo-Tokyo](docs/screenshots/akira.png) **NEO-TOKYO**: a red bike and its tail-light trail down a ruined highway | ![Thermoptic](docs/screenshots/thermoptic.png) **THERMOPTIC**: the rooftop dive, cloaking as she falls |
+| ![Cyberbrain](docs/screenshots/cyberbrain.png) **CYBERBRAIN**: a ghost-hack dive through barriers to a brain of nodes | ![Spider Tank](docs/screenshots/spidertank.png) **SPIDER TANK**: a museum hall, a tree of life, columns going to pieces |
+| ![Missile Circus](docs/screenshots/macross.png) **MISSILE CIRCUS**: volleys of corkscrewing missiles round a transforming jet | ![Valkyrie](docs/screenshots/valkyrie.png) **VALKYRIE**: a fighter turning into GERWALK and battroid on a turntable |
+| ![Bebop](docs/screenshots/bebop.png) **BEBOP**: a red fighter through asteroids and hyperspace gates, swinging on the beat | ![Angel Attack](docs/screenshots/eva.png) **ANGEL ATTACK**: an angel over a sinking city, hex warnings and a sync-ratio meter |
+| ![Hardsuit](docs/screenshots/hardsuit.png) **HARDSUIT**: four armoured skaters against a rogue android on the freeway | ![Police Labor](docs/screenshots/labor.png) **POLICE LABOR**: a patrol robot walks the harbour at dawn |
+| ![Colony](docs/screenshots/gundam.png) **COLONY**: a mobile-suit duel under a turning space colony | ![The Wired](docs/screenshots/wired.png) **THE WIRED**: humming power lines, a dark room of towers, PRESENT DAY |
+| ![Wave Motion](docs/screenshots/yamato.png) **WAVE MOTION**: a space battleship charges its bow gun, and fires | ![On Air](docs/screenshots/radio.png) **ON AIR**: a late-night radio booth riding whatever's playing |
+| ![Switchboard](docs/screenshots/switchboard.png) **SWITCHBOARD**: a 1940s exchange: lamps, cords, NUMBER, PLEASE? | ![Telegraph](docs/screenshots/telegraph.png) **TELEGRAPH**: the key taps out your commands in Morse onto ticker tape |
+| ![Mission Control](docs/screenshots/mission.png) **MISSION CONTROL**: a countdown that runs during your builds, then liftoff | ![Pneumatic Post](docs/screenshots/pneumatic.png) **PNEUMATIC POST**: a capsule down the tubes for every network connection |
+| ![Mainframe](docs/screenshots/mainframe.png) **MAINFRAME**: tape drives and lamp panels keeping pace with your CPU | ![Video Store](docs/screenshots/videostore.png) **VIDEO STORE**: aisles of tapes and a window of TVs, late at night |
+| ![Arcade](docs/screenshots/arcade.png) **ARCADE**: cabinets in attract mode at closing time | ![Pirate Radio](docs/screenshots/pirateradio.png) **PIRATE RADIO**: a broadcast ship rolling on the night sea |
+| ![Numbers Station](docs/screenshots/numbers.png) **NUMBERS STATION**: a shortwave set reading out five-digit groups | ![Night Sky](docs/screenshots/sky.png) **NIGHT SKY**: the stars, planets and Moon over you right now (your time zone's best guess) |
+| ![Data Center](docs/screenshots/datacenter.png) **DATA CENTER**: an endless cold aisle of blinking racks | ![Usenet](docs/screenshots/usenet.png) **USENET**: the newsgroup tree, a newsreader in the margins, searching for your words |
+| ![Defrag](docs/screenshots/defrag.png) **DEFRAG**: a disk optimizer packing clusters, faster while you build | ![Seti](docs/screenshots/seti.png) **SETI**: a radio-search waterfall hunting for a candidate signal |
+| ![Sneakers](docs/screenshots/sneakers.png) **SNEAKERS**: letters resolve, then fly into the anagram: TOO MANY SECRETS | ![Demoparty](docs/screenshots/demoparty.png) **DEMOPARTY**: plasma, rotozoomer, copper bars and vector balls, with greets |
+| ![Ansi Gallery](docs/screenshots/ansi.png) **ANSI GALLERY**: block-art logos and .NFOs drawn at modem speed | ![War Dialer](docs/screenshots/wardialer.png) **WAR DIALER**: a board of 555 numbers dialed one by one, hunting carriers |
+| ![Y2K](docs/screenshots/y2k.png) **Y2K**: the countdown to 2000, then 01-JAN-1900, then the patch | ![Messenger](docs/screenshots/messenger.png) **MESSENGER**: a buddy list, doors opening, chat windows floating by |
+| ![Homepage](docs/screenshots/geocities.png) **HOMEPAGE**: a 1998 homepage: under construction, hit counter, webring | ![Hacker Con](docs/screenshots/defcon.png) **HACKER CON**: a dark con floor, blinking badges, the wall of sheep, CTF scores |
 
 Also in the box: THE GRID, NEON CITY, ORBIT, RAVE WAREHOUSE, GIT GALAXY, HIGHWAY, DEEP SEA,
 PROCESS HIVE, 3D PIPES, 3D MAZE and THE STREET.
@@ -220,6 +243,16 @@ shell.
 | `Ctrl+Shift+I` | the IRC lobby beside your terminal |
 | `F11` | fullscreen |
 
+**Extras**, each a checkbox on the right-click menu:
+
+- **Look > Hollywood hacking**: every command gets the movie treatment: hex spinning, BYPASSING FIREWALL..., then ACCESS GRANTED (or DENIED when it fails).
+- **Look > CRT mode**: heavier scanlines, a curved dark edge, glowing phosphor and flicker.
+- **Look > Blue screen on errors**: a failed command flashes a fake blue screen over its pane (at most every 20 s).
+- **Look > Window style: classic**: grey bevelled frames and a title bar on every pane.
+- **Look > BIOS boot screen**: a 90s power-on self test at startup, with your real CPU, memory and drives.
+- **Music > Keyboard sounds**: a clacky mechanical keyboard, Enter and Space included.
+- **NYX > Message chimes** (on by default): little chimes when NYX speaks, a command fails or news comes in.
+
 **Music**
 
 | Key | Does |
@@ -230,9 +263,13 @@ shell.
 | `Ctrl+Shift+]` / `Ctrl+Shift+[` | next / previous track |
 | `Ctrl+Shift+=` / `Ctrl+Shift+-` | volume up / down |
 | `Ctrl+Shift+B` | synth tempo: follows your activity, or locked at `music.bpm` |
+| `Ctrl+Shift+G` | the system monitor: CPU and network graph, memory, free space on each disk, network in/out, top processes |
+| `Ctrl+Shift+K` | the synth panel: filter, resonance, low cut, drive and echo on whatever is playing; for the synth, style, layers, key and next song; for your music, tape speed |
 
 The **synth** follows your activity averaged over about 12 seconds (typing, and output scrolling
-past), so a burst barely moves it and a long session drives it up. The **jukebox** plays a folder
+past), so a burst barely moves it and a long session drives it up. Every 64 bars it starts a new
+song in a new key and style: industrial, outrun, electro, EBM, italo, halftime or breakbeat.
+Every world dances to whatever is playing (right-click > Music > Worlds dance to the music). The **jukebox** plays a folder
 of your own music (mp3, ogg, opus, flac, wav, m4a, and tracker modules: .mod .xm .s3m .it and
 friends; subfolders too) at its normal speed, shuffled or in order, in a little Winamp-style
 player in the bottom-right corner with a spectrum analyser. GIBSON listens for the bass in

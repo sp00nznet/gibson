@@ -4,6 +4,60 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-21
+
+### Added
+- The synth plays songs: every 64 bars a new style (industrial, outrun, electro, EBM, italo,
+  halftime, breakbeat) with its own drums, bass line, lead and chords, in a new key.
+- The synth panel (right-click > Music > Synth panel, Ctrl+Shift+K): cutoff, resonance, low cut,
+  drive and echo on the synth or your own music; style lock, layer mutes, ALL IN, key and next
+  song for the synth; tape speed for your music.
+- 46 worlds, in four new menu sections:
+  - Sci-fi: OUTATIME (a DeLorean to 88 mph; every other run it flies off), STARFIGHTER, WOPR,
+    SPINNER, NAVIGATOR, EXPLORERS, BLIPVERT, ARRAKIS, MOTION TRACKER and THE REAL (a hovercraft
+    through the ruined world, sentinels, the EMP).
+  - Anime: NEO-TOKYO, THERMOPTIC, CYBERBRAIN, SPIDER TANK, MISSILE CIRCUS, VALKYRIE, BEBOP,
+    ANGEL ATTACK, HARDSUIT, POLICE LABOR, COLONY, THE WIRED and WAVE MOTION.
+  - Old tech: ON AIR, SWITCHBOARD, TELEGRAPH (taps out your commands), MISSION CONTROL (counts
+    down your builds), PNEUMATIC POST, MAINFRAME (your CPU), VIDEO STORE, ARCADE, PIRATE RADIO
+    and NUMBERS STATION.
+  - Out there: NIGHT SKY, the real sky over you right now: about 140 bright stars, the
+    constellation figures, the Milky Way, the Sun, the Moon with its phase and the five
+    naked-eye planets, for a place guessed from your time zone (its city, when we know it).
+  - Scene (the 90s and 2000s): DEFRAG, SETI, SNEAKERS (anagrams, yours too), DEMOPARTY, ANSI
+    GALLERY, WAR DIALER, Y2K, MESSENGER, HOMEPAGE and HACKER CON.
+  - Cyberspace: DATA CENTER (an endless cold aisle) and USENET (searches for words from your
+    commands).
+- Extras on the right-click menu, each remembered:
+  - Look > Hollywood hacking: every command gets the movie treatment over its pane (hex
+    spinning, BYPASSING FIREWALL..., then ACCESS GRANTED, or ACCESS DENIED when it fails).
+  - Look > CRT mode: heavier scanlines, a curved dark edge, phosphor glow, more flicker.
+  - Look > Blue screen on errors: a failed command flashes a fake blue screen over its pane
+    (at most every 20 s, never takes a key).
+  - Look > Window style: classic: grey bevelled frames and a title bar on every pane.
+  - Look > BIOS boot screen: a 90s power-on self test at startup with your real CPU, memory
+    and drives (made up in screenshots).
+  - Music > Keyboard sounds: a clacky mechanical keyboard; Enter and Space sound bigger.
+  - NYX > Message chimes (on by default): short chimes when NYX speaks, a command fails or
+    news arrives.
+- Right-click > Look > Ships flying by turns off the ships that cross behind every world.
+- The system monitor (right-click > Look > System monitor, Ctrl+Shift+G): CPU and network graph,
+  memory, free space on every drive, network in/out per second and the top processes, in a
+  panel in the top-right corner. It remembers whether it was open.
+- Every world dances to the music, the synth or your own: the kick surges motion forward and
+  punches the camera in, the bass thickens the lines, the highs brighten them, trails stretch on
+  the beat. Right-click > Music > Worlds dance to the music turns it off. The synth now has a
+  spectrum too, so the visualizer worlds follow it.
+- Worlds now see the last command typed, whether a build is running, and the song playing.
+
+### Fixed
+- The "build finished" notification after long commands fires again.
+- ENDLESS ROAD no longer looks like ANTI-GRAV RACE: it's flown from the cockpit through a tunnel
+  of hoops that flash on the beat.
+- STUNT TRACK: the cars ride the road smoothly. Their heading and bank were taken from track
+  samples 3 m apart, so they twitched at every one (the camera with them), and a landing
+  snapped them up to a metre sideways onto their lane; now both glide.
+
 ## [0.18.0] - 2026-10-21
 
 ### Added

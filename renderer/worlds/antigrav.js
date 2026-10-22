@@ -1,6 +1,7 @@
 // Anti-grav racing where every track is an equation. Two worlds, both driving themselves:
 //   endless   ENDLESS ROAD     each lap morphs into the next curve; the clock tops up every lap
-//                              but pays a little less each time
+//                              but pays a little less each time. Seen from the cockpit, through a
+//                              tunnel of hoops, so it doesn't look like the race (it used to)
 //   antigrav  ANTI-GRAV RACE   three laps against seven rivals, then the results and the next track
 // Your activity is the throttle; a failed command puts you into the rail.
 (function (Worlds) {
@@ -78,6 +79,28 @@
       }
       start();
       const place = (c) => 1 + craft.filter((o) => o !== c && o.s > c.s).length;
+      // The endless road's tunnel: an octagonal hoop every few samples (all the way round, thinned
+      // out far off), joined by four long rails near you; the hoops flash on the kick.
+      const HOOP = 8, HR = HW * 1.15;
+      function hoops(pts, col, n, n0, here) {
+        const ring = (f) => Array.from({ length: HOOP }, (_, j) => { const a = j / HOOP * TAU + TAU / 16; return v3.add(v3.add(f.P, f.L, Math.cos(a) * HR), f.U, Math.sin(a) * HR + HR * 0.55); });
+        let prev = null;
+        for (let i = 0; i < pts.length; i++) {
+          const d = i - here + (n > n0 ? SAMPLES : 0), near = d > -4 && d < 90;
+          if (d < -4 || (!near && i % 12) || (near && i % 3)) continue;
+          const r = ring(pts[i]), al = near ? 0.75 + env.pulse * 0.25 : 0.3;
+          for (let j = 0; j < HOOP; j++) { const p = r[j], q = r[(j + 1) % HOOP]; seg(p[0], p[1], p[2], q[0], q[1], q[2], col, al, near ? 320 : 700); }
+          if (near && prev) for (const j of [1, 2, 5, 6]) seg(prev[j][0], prev[j][1], prev[j][2], r[j][0], r[j][1], r[j][2], col, 0.35, 260);
+          prev = near ? r : null;
+        }
+      }
+      function speedLines(v) { // streaks rushing out from the middle, more the faster you go
+        const g = k.g, W = k.W, H = k.H, n = Math.min(40, v / 8) | 0;
+        for (let i = 0; i < n; i++) {
+          const a = rand(0, TAU), r0 = rand(0.25, 0.6) * Math.min(W, H), len = rand(20, 60) * v / 150;
+          line2(W / 2 + Math.cos(a) * r0, H / 2 + Math.sin(a) * r0, W / 2 + Math.cos(a) * (r0 + len), H / 2 + Math.sin(a) * (r0 + len), C.white, 0.35);
+        }
+      }
 
       return {
         label,
@@ -118,9 +141,9 @@
         signal(kind2) { if (kind2 === 'error') { scrape = 1.2; say('INTO THE RAIL', C.hot); } },
         draw() {
           const t = env.t, cam = me, ls = lenAt(cam.s);
-          // chase camera, leaning with the road
-          const fc = frame(cam.s), fb = frame(cam.s - 10 / ls), fa = frame(cam.s + 14 / ls);
-          const eye = v3.add(v3.add(fb.P, fb.U, 3.2), fb.L, cam.lat * HW), look = v3.add(v3.add(fa.P, fa.U, 1), fa.L, cam.lat * HW * 0.5);
+          // the race: a chase camera, leaning with the road. The endless road: the cockpit, low and centred
+          const tube = kind === 'continuum', fc = frame(cam.s), fb = frame(cam.s - (tube ? 0 : 10) / ls), fa = frame(cam.s + (tube ? 20 : 14) / ls);
+          const eye = tube ? v3.add(fc.P, fc.U, 1.6) : v3.add(v3.add(fb.P, fb.U, 3.2), fb.L, cam.lat * HW), look = tube ? v3.add(fa.P, fa.U, 1.6) : v3.add(v3.add(fa.P, fa.U, 1), fa.L, cam.lat * HW * 0.5);
           const fw = v3.norm(v3.sub(look, eye)), yaw = Math.atan2(fw[0], fw[2]), pitch = Math.asin(Math.max(-1, Math.min(1, fw[1])));
           const r0 = [Math.cos(yaw), 0, -Math.sin(yaw)], u0 = [-Math.sin(yaw) * Math.sin(pitch), Math.cos(pitch), -Math.cos(yaw) * Math.sin(pitch)];
           setCam({ x: eye[0], y: eye[1], z: eye[2], yaw, pitch, roll: Math.atan2(v3.dot(fc.U, r0), v3.dot(fc.U, u0)) });
@@ -129,6 +152,7 @@
           for (const n of kind === 'continuum' ? [n0, n0 + 1] : [n0]) {
             const L = lap(Math.max(0, n)), pts = L.pts, col = L.col;
             const here = (cam.s - n) * SAMPLES;
+            if (tube) { hoops(pts, col, n, n0, here); continue; }
             for (let i = 1; i < pts.length; i++) {
               const a = pts[i - 1], b = pts[i], A = [v3.add(a.P, a.L, HW), v3.add(a.P, a.L, -HW)], B = [v3.add(b.P, b.L, HW), v3.add(b.P, b.L, -HW)];
               let d = i - here; if (kind !== 'continuum') d = ((d % SAMPLES) + SAMPLES) % SAMPLES; else if (n > n0) d += SAMPLES;
@@ -139,8 +163,10 @@
               if (near && i % 26 === 0) { const s1 = v3.add(v3.add(a.P, a.T, -1), a.L, 1.5), s2 = v3.add(a.P, a.T, 1), s3 = v3.add(v3.add(a.P, a.T, -1), a.L, -1.5); for (const [p, q] of [[s1, s2], [s2, s3]]) seg(p[0], p[1] + 0.05, p[2], q[0], q[1] + 0.05, q[2], C.gold, env.pulse > 0.5 ? 1 : 0.5, 200); } // beat pads
             }
           }
-          // the field
+          if (tube) speedLines(cam.v);
+          // the field (from the cockpit, not yourself)
           for (const c of craft) {
+            if (tube && c === me) continue;
             const s = c.s, col = c.col, al = 1;
             const f = frame(s), o = v3.add(v3.add(f.P, f.L, c.lat * HW), f.U, 0.7 + Math.sin(t * 3 + (c.ph || 0)) * 0.08);
             const at = (x, y, z) => [o[0] - f.L[0] * x + f.U[0] * y + f.T[0] * z, o[1] - f.L[1] * x + f.U[1] * y + f.T[1] * z, o[2] - f.L[2] * x + f.U[2] * y + f.T[2] * z];

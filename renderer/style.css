@@ -146,3 +146,62 @@ body.nologo #banner { display: none; }
 ::-webkit-scrollbar { width: 8px; background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(57, 255, 156, 0.2); }
 ::-webkit-scrollbar-button { display: none; }
+
+/* --- the extras (right-click > Look, Music, NYX) --- */
+/* Hollywood hacking: over the pane, never in the way */
+.hw, .bsod { position: absolute; inset: 0; z-index: 4; pointer-events: none; transition: opacity 0.4s; }
+.hw.out, .bsod.out { opacity: 0; }
+.hw { background: rgba(0, 8, 4, 0.82); font: 13px 'Cascadia Mono', Consolas, monospace; color: var(--neon); overflow: hidden; }
+.hw .hex { position: absolute; left: 10px; top: 8px; margin: 0; font-size: 11px; color: rgba(57, 255, 156, 0.35); }
+.hw .steps { position: absolute; left: 50%; top: 28%; transform: translateX(-50%); text-shadow: 0 0 6px var(--neon); }
+.hw .steps div { margin: 5px 0; white-space: nowrap; }
+.hw .bar { display: inline-block; width: 120px; height: 8px; border: 1px solid var(--neon); vertical-align: middle; margin-left: 6px; }
+.hw .bar i { display: block; height: 100%; width: 0; background: var(--neon); box-shadow: 0 0 6px var(--neon); transition: width 0.35s linear; }
+.hw .verdict { position: absolute; left: 0; right: 0; top: 55%; text-align: center; font-size: clamp(20px, 4.5vw, 52px); font-weight: bold; letter-spacing: 0.15em; animation: hwin 0.3s ease-out; }
+.hw .verdict.yes { color: var(--neon); text-shadow: 0 0 18px var(--neon), 0 0 3px #fff; }
+.hw .verdict.no { color: var(--hot); text-shadow: 0 0 18px var(--hot), 0 0 3px #fff; }
+@keyframes hwin { from { transform: scale(2.2); opacity: 0; } }
+/* the blue screen */
+.bsod { background: #0000aa; color: #fff; font: 15px 'Cascadia Mono', Consolas, monospace; padding: 10% 8%; white-space: pre-wrap; }
+.bsod .t { text-align: center; }
+.bsod .t span:not(.cur) { background: #aaa; color: #0000aa; }
+.bsod .cur { animation: bsodblink 0.5s steps(1) infinite; }
+@keyframes bsodblink { 50% { opacity: 0; } }
+/* the BIOS screen: the boot overlay, grey on black, top left */
+#biologo { display: none; position: absolute; top: 24px; right: 40px; margin: 0; color: #5f5; font-size: 14px; }
+#boot.bios { align-items: flex-start; justify-content: flex-start; padding: 24px 32px; }
+#boot.bios #bootlog { color: #c0c0c0; text-shadow: none; font-size: 16px; }
+#boot.bios #biologo { display: block; }
+/* CRT mode: heavier scanlines, a dark curved edge, glowing phosphor, more flicker */
+body.crt #crt {
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.9) 100%);
+  box-shadow: inset 0 0 140px 50px rgba(0, 0, 0, 0.85);
+  animation: crtflicker 0.09s infinite;
+}
+@keyframes crtflicker { 0%, 100% { opacity: 0.88; } 50% { opacity: 1; } }
+body.crt #frame { border-radius: 26px / 20px; overflow: hidden; }
+body.crt .xterm-screen { filter: drop-shadow(0 0 2px rgba(57, 255, 156, 0.6)) brightness(1.1); }
+/* Window style: classic. Grey bevels, a title bar on every pane, buttons that don't do anything */
+body.classic #frame { border: 2px solid; border-color: #dfdfdf #404040 #404040 #dfdfdf; box-shadow: none; }
+body.classic #nyx { background: #c0c0c0; border-color: #808080; }
+body.classic #nyx { color: #000; text-shadow: none; }
+body.classic #nyx .tag { color: #000080; }
+body.classic #tabs { background: #c0c0c0; }
+body.classic #tabs button { color: #000; background: #c0c0c0; border: 2px solid; border-color: #fff #404040 #404040 #fff; box-shadow: none; font-family: Tahoma, 'Segoe UI', sans-serif; }
+body.classic #tabs button.on { border-bottom-color: #c0c0c0; font-weight: bold; }
+body.classic .pane { padding-top: 26px !important; border: 2px solid !important; border-color: #dfdfdf #404040 #404040 #dfdfdf !important; box-shadow: none !important; }
+body.classic .pane::before {
+  content: attr(data-title); position: absolute; left: 2px; right: 2px; top: 2px; height: 18px; padding-left: 5px;
+  font: bold 11px/18px Tahoma, 'Segoe UI', sans-serif; color: #c0c0c0; background: linear-gradient(90deg, #808080, #b5b5b5);
+  white-space: nowrap; overflow: hidden;
+}
+body.classic .pane.focus::before { color: #fff; background: linear-gradient(90deg, #000080, #1084d0); }
+body.classic .pane::after { /* minimize, maximize, close: three bevelled grey buttons */
+  content: '_\25A1\00D7'; position: absolute; right: 5px; top: 4px; width: 50px; height: 14px; z-index: 1;
+  font: bold 10px/14px monospace; letter-spacing: 11px; text-indent: 5px; color: #000; white-space: nowrap; overflow: hidden;
+  background:
+    linear-gradient(#c0c0c0, #c0c0c0) 0 0 / 16px 14px no-repeat, linear-gradient(#c0c0c0, #c0c0c0) 17px 0 / 16px 14px no-repeat, linear-gradient(#c0c0c0, #c0c0c0) 34px 0 / 16px 14px no-repeat,
+    linear-gradient(#404040, #404040) 1px 1px / 16px 14px no-repeat, linear-gradient(#404040, #404040) 18px 1px / 16px 14px no-repeat, linear-gradient(#404040, #404040) 35px 1px / 16px 14px no-repeat;
+}

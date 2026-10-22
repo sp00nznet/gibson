@@ -89,7 +89,7 @@
       seg(s[0], s[1], s[2], s[0], s[1], s[2] + 0.4 + sp * 0.04, C.white, 0.7, 170);
     }
     flyT -= dt;
-    if (!flyby && flyT < 0) {
+    if (!flyby && flyT < 0 && env.ships !== false) {
       const dir = Math.random() < 0.5 ? 1 : -1;
       flyby = { x: -60 * dir, y: rand(-12, 14), z: rand(18, 50), vx: dir * rand(30, 60), col: pick([C.ice, C.hot, C.gold, C.neon]), n: Math.random() < 0.3 ? 3 : 1 };
     }
@@ -607,24 +607,31 @@
   })();
 
   // --- engine ----------------------------------------------------------------
-  const env = { t: 0, speed: 10, level: 0, pulse: 0, warp: 0, bright: 1, fs: null, git: null, packets: true };
+  const env = { t: 0, speed: 10, level: 0, pulse: 0, bass: 0, mid: 0, high: 0, warp: 0, bright: 1, fs: null, git: null, packets: true };
   let cur = 'grid', prev = null, trans = 1, last = 0, source = () => ({});
 
   function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; F = H * 0.9; }
   function frame(ts) {
     const dt = Math.min(0.05, (ts - last) / 1000 || 0.016); last = ts;
     Object.assign(env, source(dt));
-    env.t += dt; env.speed = 8 + env.level * 70 + env.warp * 60;
-    env.bright = 0.75 + env.pulse * 0.25;
+    // The dance: every world hears the music. bass/mid/high come from the spectrum (synth or
+    // jukebox), smoothed; the kick (pulse) surges time forward and punches the camera in, the bass
+    // thickens the lines, the highs brighten them, and trails stretch on the beat.
+    const d = env.dance === false ? 0 : 1, sp = env.spec, band = (a, b) => { let m = 0; for (let i = a; i < b; i++) m += sp[i]; return m / (b - a); };
+    for (const [key, v] of [['bass', sp ? band(0, 6) : env.pulse * 0.6], ['mid', sp ? band(12, 28) : 0], ['high', sp ? band(30, sp.length) : 0]]) env[key] += (v * d - env[key]) * Math.min(1, dt * 14);
+    const step = dt * (1 + d * env.pulse * 0.6);
+    env.t += step; env.speed = 8 + env.level * 70 + env.warp * 60;
+    env.bright = 0.75 + env.pulse * 0.25 + env.high * 0.3;
+    F = H * 0.9 * (1 + d * (env.pulse * 0.025 + env.bass * 0.02));
     g.globalCompositeOperation = 'source-over';
-    g.fillStyle = `rgba(0,0,0,${0.28 + (1 - env.level) * 0.25})`; g.fillRect(0, 0, W, H);
-    g.globalCompositeOperation = 'lighter'; g.lineWidth = 1.5;
-    sharedLayers(dt); flush();
+    g.fillStyle = `rgba(0,0,0,${(0.28 + (1 - env.level) * 0.25) * (1 - d * env.pulse * 0.35)})`; g.fillRect(0, 0, W, H);
+    g.globalCompositeOperation = 'lighter'; g.lineWidth = 1.5 + env.bass * 1.2;
+    sharedLayers(step); flush();
     if (trans < 1 && prev) {
       trans = Math.min(1, trans + dt * 1.6);
-      worlds[prev].update(dt); g.globalAlpha = 1 - trans; worlds[prev].draw(); flush();
+      worlds[prev].update(step); g.globalAlpha = 1 - trans; worlds[prev].draw(); flush();
     }
-    worlds[cur].update(dt); g.globalAlpha = trans; worlds[cur].draw(); flush(); g.globalAlpha = 1;
+    worlds[cur].update(step); g.globalAlpha = trans; worlds[cur].draw(); flush(); g.globalAlpha = 1;
     if (trans < 1) { // glitch slices during the crossing
       for (let i = 0; i < 6; i++) { const y = Math.random() * H, h = rand(4, 30); g.drawImage(cv, 0, y, W, h, rand(-40, 40), y, W, h); }
     }

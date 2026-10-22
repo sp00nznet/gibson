@@ -3,10 +3,10 @@
 // below are the whole personality when no LLM is configured; with one, the model
 // writes the line and these are the fallback.
 (function (root) {
-  const MOOD_WORLD = { welcoming: 'grid', tender: 'toasters', curious: 'files', playful: ['cycles', 'fringe', 'rocks', 'stunt'], taunting: ['battle', 'nocturne', 'deathmatch'], impressed: ['city', 'attractor'], bored: 'highway', intense: 'core' };
+  const MOOD_WORLD = { welcoming: 'grid', tender: 'toasters', curious: 'files', playful: ['cycles', 'fringe', 'rocks', 'stunt'], taunting: ['battle', 'nocturne', 'deathmatch'], impressed: ['city', 'attractor', 'gundam'], bored: 'highway', intense: 'core' };
   // Some events have a world of their own, whatever her mood.
   // A list means one of them, at random.
-  const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: ['core', 'garbage', 'ruins'], ssh: 'core', streak: ['rave', 'hack', 'towers', 'cyberpunk', 'deathmatch', 'endless', 'antigrav', 'tube', 'trench'], track: ['milkdrop', 'kaleido', 'starburst'], idle: ['maze', 'skyline', 'mystify', 'flowerbox', 'life', 'nocturne', 'lander', 'trader'], compile: ['pipes', 'helix'], done: 'keygen', net: ['net', 'traffic'], hog: 'hive', news: ['news', 'newsglobe'] };
+  const EVENT_WORLD = { boot: 'bbs', git: 'git', error: 'ice', danger: ['core', 'garbage', 'ruins', 'wopr', 'tracker', 'eva', 'yamato'], ssh: ['core', 'cyberbrain', 'wired'], streak: ['rave', 'hack', 'towers', 'cyberpunk', 'deathmatch', 'endless', 'antigrav', 'tube', 'trench', 'outatime', 'starfighter', 'akira', 'macross', 'spidertank', 'headroom', 'bebop', 'hardsuit', 'valkyrie', 'real', 'wardialer', 'defcon'], track: ['milkdrop', 'kaleido', 'starburst', 'radio'], idle: ['sky', 'geocities', 'ansi', 'demoparty', 'y2k', 'maze', 'skyline', 'mystify', 'flowerbox', 'life', 'nocturne', 'lander', 'trader', 'navigator', 'explorers', 'arrakis', 'spinner', 'thermoptic', 'numbers', 'videostore', 'arcade', 'pirateradio', 'labor'], compile: ['pipes', 'helix', 'mission', 'mainframe', 'datacenter', 'defrag', 'seti'], done: ['keygen', 'sneakers'], net: ['net', 'traffic', 'switchboard', 'pneumatic', 'telegraph', 'messenger'], hog: ['hive', 'mainframe'], news: ['news', 'newsglobe', 'usenet'] };
 
   const LINES = {
     boot: [
